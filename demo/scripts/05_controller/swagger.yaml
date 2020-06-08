@@ -1,0 +1,65 @@
+---
+swagger: "2.0"
+info:
+  description: "A nornir3 demo"
+  version: "0.0.1"
+  title: "nornir3 demo orchestrator"
+host: "localhost:5000"
+basePath: "/"
+schemes:
+    - http
+paths:
+    /upgrade-os/:
+      post:
+        tags:
+          - tasks
+        parameters:
+          - name: request
+            in: body
+            schema:
+                $ref: "#/definitions/UpgradeOSRequest"
+        responses:
+          200:
+            description: Job completed
+            schema:
+                $ref: "#/definitions/TaskResponse"
+definitions:
+  UpgradeOSRequest:
+    properties:
+      version:
+        description: OS version to install
+        type: string
+      runner:
+        description: Name of runner to use
+        type: string
+        enum:
+          - "parallel"
+          - "dcaware"
+        default: dcaware
+      filter_sites:
+        description: Execute on only these sites
+        type: array
+        items:
+            type: string
+      filter_dev_types:
+        description: Execute on only these device types
+        type: array
+        items:
+            type: string
+  TaskResponse:
+    properties:
+      completed:
+        description: List of hosts that completed successfully
+        type: array
+        items:
+            type: string
+      failed:
+        description: List of hosts that failed
+        type: array
+        items:
+            type: string
+      skipped:
+        description: List of hosts that were skipped
+        type: array
+        items:
+            type: string

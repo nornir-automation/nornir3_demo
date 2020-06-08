@@ -1,0 +1,6 @@
+[nornir.plugins.connections]
+acmeos = nornir3_demo.plugins.connections.acmeos:AcmeOS
+
+[nornir.plugins.inventory]
+ACMEInventory = nornir3_demo.plugins.inventory.acme:ACMEInventory
+

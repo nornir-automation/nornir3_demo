@@ -1,0 +1,121 @@
+import time
+from typing import Dict, List, Optional
+from concurrent.futures import ThreadPoolExecutor
+
+from nornir.core.task import AggregatedResult, Task
+from nornir.core.inventory import Host
+
+
+class DeviceGroups:
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.pending_hosts: List[Host] = []
+        self.completed_hosts: List[Host] = []
+        self.failed_hosts: List[Host] = []
+        self.in_progress: Optional[Host] = None
+
+    def append(self, host: Host) -> None:
+        self.pending_hosts.append(host)
+
+    def next(self) -> Host:
+        self.in_progress = self.pending_hosts.pop(0)
+        return self.in_progress
+
+    def ready(self) -> bool:
+        return self.in_progress is None
+
+    def pending(self) -> bool:
+        return len(self.pending_hosts) > 0 and len(self.failed_hosts) == 0
+
+    def complete(self) -> None:
+        self.completed_hosts.append(self.in_progress)
+        self.in_progress = None
+
+    def fail(self) -> None:
+        self.failed_hosts.append(self.in_progress)
+        self.in_progress = None
+
+
+def get_group_name(host: Host) -> str:
+    site = host.data["site"]
+    dev_type = host.data["dev_type"]
+    rack = host.data["rack"]
+
+    if dev_type == "leaf":
+        group_name = f"{site}_{dev_type}_{rack}"
+    else:
+        group_name = f"{site}_{dev_type}"
+    return group_name
+
+
+class DC(Dict[str, DeviceGroups]):
+    def pending(self) -> bool:
+        return any([dg.pending() for dg in self.values()])
+
+    def batch(self) -> Host:
+        for group_name, dg in self.items():
+            print(group_name, dg.ready(), dg.pending())
+            if dg.ready() and dg.pending():
+                yield dg.next()
+
+    def complete(self, host: Host) -> None:
+        group_name = get_group_name(host)
+        self[group_name].complete()
+
+    def fail(self, host: Host) -> None:
+        group_name = get_group_name(host)
+        self[group_name].fail()
+
+
+def sort_hosts(hosts: List[Host]) -> DC:
+    dc = DC()
+    for host in hosts:
+        group_name = get_group_name(host)
+
+        if group_name not in dc:
+            dc[group_name] = DeviceGroups(group_name)
+
+        dc[group_name].append(host)
+
+    return dc
+
+
+class DCAwareRunner:
+    """
+    ThreadedRunner runs the task over each host using threads
+
+    Arguments:
+        num_workers: number of threads to use
+    """
+
+    def __init__(self, num_workers: int = 20) -> None:
+        self.num_workers = num_workers
+
+    def run(self, task: Task, hosts: List[Host]) -> AggregatedResult:
+        dc = sort_hosts(hosts)
+        result = AggregatedResult(task.name)
+        futures = []
+
+        try:
+            with ThreadPoolExecutor(self.num_workers) as pool:
+                while dc.pending():
+                    for host in dc.batcj():
+                        future = pool.submit(task.copy().start, host)
+                        futures.append(future)
+
+                    for future in futures:
+                        worker_result = future.result()
+                        result[worker_result.host.name] = worker_result
+                        if worker_result.failed:
+                            print(1)
+                            dc.fail(worker_result.host)
+                        else:
+                            print(2)
+                            dc.complete(worker_result.host)
+                    time.sleep(1)
+        except Exception as exc:
+            import ipdb
+
+            ipdb.set_trace()
+            print(exc)
+        return result
