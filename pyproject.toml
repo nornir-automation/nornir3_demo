@@ -11,6 +11,9 @@ license = "Apache-2.0"
 [tool.poetry.plugins."nornir.plugins.connections"]
 "acmeos" = "nornir3_demo.plugins.connections.acmeos:AcmeOS"
 
+[tool.poetry.plugins."nornir.plugins.runners"]
+"DCAwareRunner" = "nornir3_demo.plugins.runners.dc_aware:DCAwareRunner"
+
 [tool.poetry.dependencies]
 python = "^3.6"
 nornir = { version = "~3.0.0a4", allow-prereleases = true }

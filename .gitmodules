@@ -1,0 +1,3 @@
+[submodule "docs/_src/themes/reveal-hugo"]
+	path = docs/_src/themes/reveal-hugo
+	url = git@github.com:dzello/reveal-hugo.git

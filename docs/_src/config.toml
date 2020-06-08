@@ -1,0 +1,13 @@
+baseURL = "https://nornir.tech/nornir3_demo"
+languageCode = "en-us"
+title = "Nornir 3 demo"
+
+theme = "reveal-hugo"
+
+[markup.goldmark.renderer]
+unsafe = true
+
+[outputFormats.Reveal]
+baseName = "index"
+mediaType = "text/html"
+isHTML = true

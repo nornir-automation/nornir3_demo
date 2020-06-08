@@ -20,6 +20,8 @@ class Logger:
         self.logger.addHandler(handler)
 
     def task_started(self, task: Task) -> None:
+        # we generate a unique uuid and attach it to all the logs
+        # this unique uuid will allow us to correlate logs and filter them by task execution
         self.uuid = uuid.uuid4()
         self.logger.info("%s:starting  task:%s", self.uuid, task.name)
 
@@ -53,7 +55,7 @@ class Logger:
         self, task: Task, host: Host, result: MultiResult
     ) -> None:
         if result.failed:
-            self.logger.debug(
+            self.logger.error(
                 "%s:completed subtask:%s:%s:%s",
                 self.uuid,
                 task.host.name,
@@ -62,7 +64,7 @@ class Logger:
             )
         else:
             self.logger.debug(
-                "%s:completed host:%s:%s:%s",
+                "%s:completed subtas:%s:%s:%s",
                 self.uuid,
                 task.host.name,
                 task.name,

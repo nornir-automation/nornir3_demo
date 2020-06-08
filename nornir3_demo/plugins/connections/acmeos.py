@@ -1,7 +1,6 @@
 from typing import Any, Dict, Optional
 
 from nornir.core.configuration import Config
-from nornir.core.connections import ConnectionPlugin
 
 from nornir3_demo.ext.acmeos import AcmeOSAPI
 
@@ -9,7 +8,7 @@ from nornir3_demo.ext.acmeos import AcmeOSAPI
 CONNECTION_NAME = "acmeos"
 
 
-class AcmeOS(ConnectionPlugin):
+class AcmeOS:
     def open(
         self,
         hostname: Optional[str],

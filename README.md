@@ -1,9 +1,8 @@
 nornir3_demo
 ============
 
+David Barroso - [linkedin](https://www.linkedin.com/in/dbarrosop) - [github](https://github.com/dbarrosop/) - [twitter](https://twitter.com/dbarrosop)
 
-python orchestrator.py
+Part of [ipSpace's Network Automation Roadmap](https://www.ipspace.net/Nornir)
 
-curl -X POST "http://localhost:5000/upgrade-os/" -H  "accept: application/json" -H  "Content-Type: application/json" -d "{  \"version\": \"5.3.1\",  \"runner\": \"dcaware\"}"
-
-docker run --rm -p 8080:8080 swaggerapi/swagger-ui
+[Slides](https://nornir.tech/nornir3_demo) [Github](https://github.com/nornir-automation/nornir3_demo)

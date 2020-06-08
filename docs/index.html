@@ -1,0 +1,1337 @@
+<!doctype html>
+<html lang="en">
+  <head>
+	<meta name="generator" content="Hugo 0.72.0" /><script src="/livereload.js?port=1313&mindelay=10&v=2" data-no-instant defer></script>
+    <meta charset="utf-8">
+<title>Nornir 3 demo</title>
+
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="/nornir3_demo/reveal-js/css/reset.css">
+<link rel="stylesheet" href="/nornir3_demo/reveal-js/css/reveal.css"><link rel="stylesheet" href="/nornir3_demo/reveal-js/css/theme/black.css" id="theme">
+<link rel="stylesheet" href="/nornir3_demo/highlight-js/default.min.css">
+    
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+  
+
+    <section><h1 id="nornir-3-demo">Nornir 3 demo</h1>
+<p>David Barroso - <a href="https://www.linkedin.com/in/dbarrosop">linkedin</a> - <a href="https://github.com/dbarrosop/">github</a> - <a href="https://twitter.com/dbarrosop">twitter</a></p>
+<p>Part of <a href="https://www.ipspace.net/Nornir">ipSpace&rsquo;s Network Automation Roadmap</a></p>
+<p><a href="https://nornir.tech/nornir3_demo">Slides</a> <a href="https://github.com/nornir-automation/nornir3_demo">Github</a></p>
+</section>
+
+  
+
+    <section>
+
+<section data-shortcode-section>
+<h2 id="introduction">Introduction</h2>
+<p>In this presentation we are going to do a nornir 3 deep dive.</p>
+<p>To do so we are going to pretend we have been hired by Acme Corp. and tasked to build the necessary tooling so the network engineering team can easily build their own tooling</p>
+</section><section>
+<h2 id="goals">Goals</h2>
+<ol>
+<li>Write an inventory plugin to interact with Acme Inventory System</li>
+<li>Write a connection plugin and a few taks to interact with AcmeOS</li>
+<li>Write a few processors to show meaningful information to users and to log custom events to syslog</li>
+<li>Write a runner that understands Acme&rsquo;s network topology in order to safely deploy changes at scale</li>
+<li>Write a few functions to show more meaningful information to users</li>
+<li>Build a POC for a network orchestrator</li>
+</ol>
+
+</section>
+</section>
+    <section>
+
+<section data-shortcode-section>
+<h2 id="inventory-plugins">Inventory plugins</h2>
+<p>An inventory plugin is a nornir plugin that allows nornir to create an <code>Inventory</code> object from an external source</p>
+</section><section>
+<p>It is implemented by writing a class with the following structure:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#f92672">from</span> typing <span style="color:#f92672">import</span> Dict, Optional, List
+
+<span style="color:#f92672">from</span> nornir.core.inventory <span style="color:#f92672">import</span> Inventory
+
+<span style="color:#66d9ef">class</span> <span style="color:#a6e22e">MyPlugin</span>:
+    <span style="color:#66d9ef">def</span> __init__(self, <span style="color:#f92672">*</span>args: Any, <span style="color:#f92672">**</span>kwargs: Any) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#75715e"># This method will allow you to configure the plugin</span>
+        <span style="color:#75715e"># For instance, when creating the object inventory.options will be passed</span>
+        <span style="color:#75715e"># to this constructor</span>
+        <span style="color:#f92672">...</span>
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">load</span>(self) <span style="color:#f92672">-&gt;</span> Inventory:
+        <span style="color:#75715e"># This method will be called and it will be responsible to instantiate and</span>
+        <span style="color:#75715e"># return the Inventory</span>
+        <span style="color:#f92672">...</span>
+</code></pre></div></section><section>
+<h2 id="registering-the-inventory-plugin">Registering the Inventory plugin</h2>
+<p>In order for nornir to be able to use the inventory plugin we need to register it. You can do so in two ways:</p>
+<ol>
+<li>Using <a href="https://setuptools.readthedocs.io/en/latest/setuptools.html#dynamic-discovery-of-services-and-plugins">entrypoints</a></li>
+<li>Programmatically</li>
+</ol>
+</section><section>
+<h3 id="registering-inventory-plugins-using-entry-points">Registering Inventory Plugins using Entry Points</h3>
+<p>Add to your <code>setup.py</code>:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape>setup(
+    <span style="color:#75715e"># ...</span>
+    entry_points<span style="color:#f92672">=</span>{
+      <span style="color:#e6db74">&#34;nornir.plugins.inventory&#34;</span>: <span style="color:#e6db74">&#34;inventory-name = path.to:InventoryPlugin&#34;</span>,
+    }
+)
+</code></pre></div><p>Or if using poetry, add to <code>pyproject.toml</code>:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape>[<span style="color:#a6e22e">tool</span>.<span style="color:#a6e22e">poetry</span>.<span style="color:#a6e22e">plugins</span>.<span style="color:#e6db74">&#34;nornir.plugins.inventory&#34;</span>]
+<span style="color:#e6db74">&#34;inventory-name&#34;</span> = <span style="color:#e6db74">&#34;path.to:InventoryPlugin&#34;</span>
+</code></pre></div><ul>
+<li><strong><code>inventory_name</code></strong> is the name of the inventory, you will refer to this plugin by this name in the <code>inventory.plugin</code> configuration option in <code>config.yaml</code> or when calling <code>InitNornir</code></li>
+<li><strong><code>path.to:InventoryPlugin</code></strong> is the path to the class implementing the plugin</li>
+</ul>
+</section><section>
+<h3 id="registering-inventory-plugins-programmatically">Registering Inventory Plugins Programmatically</h3>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#f92672">from</span> nornir.core.plugins.inventory <span style="color:#f92672">import</span> InventoryPluginRegister
+
+<span style="color:#f92672">from</span> path.to <span style="color:#f92672">import</span> InventoryPlugin
+
+
+InventoryPluginRegister<span style="color:#f92672">.</span>register(<span style="color:#e6db74">&#34;inventory-name&#34;</span>, InventoryPlugin)
+
+</code></pre></div></section><section>
+<h2 id="example-acmes-inventory-plugin">Example: Acme&rsquo;s Inventory Plugin</h2>
+<p>We are using as inventory ACME&rsquo;s inventory system. In order to interact with it we could use <code>requests</code> or some other library, however, we have been given already a library that interacts with the backend so we are going to leverage it.</p>
+<p>Looking at the documentation given to us by the developer of the library we care about the following methods:</p>
+<ul>
+<li><code>ACMEAPI()</code> - Create an instance of the object to interact with the inventory. Takes no arguments.</li>
+<li><code>get(filter_sites: Optional[List[str]] = None, filter_dev_types: Optional[List[str]] = None)</code> - Returns information about all of our hosts spread across all of our datacenters. This method takes an optional list of sites and an optional list of device types to help us filter the inventory.</li>
+</ul>
+</section><section>
+<p>Let&rsquo;s start by trying the library in the console:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#960050;background-color:#1e0010">$</span> ipython
+In [<span style="color:#ae81ff">1</span>]: <span style="color:#f92672">from</span> nornir3_demo.ext.inventory <span style="color:#f92672">import</span> ACMEAPI
+In [<span style="color:#ae81ff">2</span>]: acme <span style="color:#f92672">=</span> ACMEAPI()
+In [<span style="color:#ae81ff">3</span>]: acme<span style="color:#f92672">.</span>get()
+Out[<span style="color:#ae81ff">3</span>]:
+{<span style="color:#e6db74">&#39;mercury&#39;</span>: {<span style="color:#e6db74">&#39;edge00.mercury&#39;</span>: {<span style="color:#e6db74">&#39;platform&#39;</span>: <span style="color:#e6db74">&#39;acmeos&#39;</span>,
+   <span style="color:#e6db74">&#39;dev_type&#39;</span>: <span style="color:#e6db74">&#39;edge&#39;</span>,
+   <span style="color:#e6db74">&#39;rack&#39;</span>: <span style="color:#e6db74">&#39;10&#39;</span>},
+  <span style="color:#e6db74">&#39;edge01.mercury&#39;</span>: {<span style="color:#e6db74">&#39;platform&#39;</span>: <span style="color:#e6db74">&#39;acmeos&#39;</span>, <span style="color:#e6db74">&#39;dev_type&#39;</span>: <span style="color:#e6db74">&#39;edge&#39;</span>, <span style="color:#e6db74">&#39;rack&#39;</span>: <span style="color:#e6db74">&#39;10&#39;</span>},
+  <span style="color:#e6db74">&#39;spine00.mercury&#39;</span>: {<span style="color:#e6db74">&#39;platform&#39;</span>: <span style="color:#e6db74">&#39;acmeos&#39;</span>, <span style="color:#e6db74">&#39;dev_type&#39;</span>: <span style="color:#e6db74">&#39;spine&#39;</span>, <span style="color:#e6db74">&#39;rack&#39;</span>: <span style="color:#e6db74">&#39;20&#39;</span>},
+  <span style="color:#e6db74">&#39;spine01.mercury&#39;</span>: {<span style="color:#e6db74">&#39;platform&#39;</span>: <span style="color:#e6db74">&#39;acmeos&#39;</span>, <span style="color:#e6db74">&#39;dev_type&#39;</span>: <span style="color:#e6db74">&#39;spine&#39;</span>, <span style="color:#e6db74">&#39;rack&#39;</span>: <span style="color:#e6db74">&#39;20&#39;</span>},
+  <span style="color:#e6db74">&#39;spine02.mercury&#39;</span>: {<span style="color:#e6db74">&#39;platform&#39;</span>: <span style="color:#e6db74">&#39;acmeos&#39;</span>, <span style="color:#e6db74">&#39;dev_type&#39;</span>: <span style="color:#e6db74">&#39;spine&#39;</span>, <span style="color:#e6db74">&#39;rack&#39;</span>: <span style="color:#e6db74">&#39;21&#39;</span>},
+  <span style="color:#e6db74">&#39;spine03.mercury&#39;</span>: {<span style="color:#e6db74">&#39;platform&#39;</span>: <span style="color:#e6db74">&#39;acmeos&#39;</span>, <span style="color:#e6db74">&#39;dev_type&#39;</span>: <span style="color:#e6db74">&#39;spine&#39;</span>, <span style="color:#e6db74">&#39;rack&#39;</span>: <span style="color:#e6db74">&#39;21&#39;</span>},
+  <span style="color:#e6db74">&#39;leaf00.mercury&#39;</span>: {<span style="color:#e6db74">&#39;platform&#39;</span>: <span style="color:#e6db74">&#39;acmeos&#39;</span>, <span style="color:#e6db74">&#39;dev_type&#39;</span>: <span style="color:#e6db74">&#39;leaf&#39;</span>, <span style="color:#e6db74">&#39;rack&#39;</span>: <span style="color:#e6db74">&#39;100&#39;</span>},
+  <span style="color:#e6db74">&#39;leaf01.mercury&#39;</span>: {<span style="color:#e6db74">&#39;platform&#39;</span>: <span style="color:#e6db74">&#39;acmeos&#39;</span>, <span style="color:#e6db74">&#39;dev_type&#39;</span>: <span style="color:#e6db74">&#39;leaf&#39;</span>, <span style="color:#e6db74">&#39;rack&#39;</span>: <span style="color:#e6db74">&#39;100&#39;</span>},
+
+  <span style="color:#f92672">...</span>
+
+  <span style="color:#e6db74">&#39;leaf94.neptune&#39;</span>: {<span style="color:#e6db74">&#39;platform&#39;</span>: <span style="color:#e6db74">&#39;acmeos&#39;</span>, <span style="color:#e6db74">&#39;dev_type&#39;</span>: <span style="color:#e6db74">&#39;leaf&#39;</span>, <span style="color:#e6db74">&#39;rack&#39;</span>: <span style="color:#e6db74">&#39;147&#39;</span>},
+  <span style="color:#e6db74">&#39;leaf95.neptune&#39;</span>: {<span style="color:#e6db74">&#39;platform&#39;</span>: <span style="color:#e6db74">&#39;acmeos&#39;</span>, <span style="color:#e6db74">&#39;dev_type&#39;</span>: <span style="color:#e6db74">&#39;leaf&#39;</span>, <span style="color:#e6db74">&#39;rack&#39;</span>: <span style="color:#e6db74">&#39;147&#39;</span>},
+  <span style="color:#e6db74">&#39;leaf96.neptune&#39;</span>: {<span style="color:#e6db74">&#39;platform&#39;</span>: <span style="color:#e6db74">&#39;acmeos&#39;</span>, <span style="color:#e6db74">&#39;dev_type&#39;</span>: <span style="color:#e6db74">&#39;leaf&#39;</span>, <span style="color:#e6db74">&#39;rack&#39;</span>: <span style="color:#e6db74">&#39;148&#39;</span>},
+  <span style="color:#e6db74">&#39;leaf97.neptune&#39;</span>: {<span style="color:#e6db74">&#39;platform&#39;</span>: <span style="color:#e6db74">&#39;acmeos&#39;</span>, <span style="color:#e6db74">&#39;dev_type&#39;</span>: <span style="color:#e6db74">&#39;leaf&#39;</span>, <span style="color:#e6db74">&#39;rack&#39;</span>: <span style="color:#e6db74">&#39;148&#39;</span>},
+  <span style="color:#e6db74">&#39;leaf98.neptune&#39;</span>: {<span style="color:#e6db74">&#39;platform&#39;</span>: <span style="color:#e6db74">&#39;acmeos&#39;</span>, <span style="color:#e6db74">&#39;dev_type&#39;</span>: <span style="color:#e6db74">&#39;leaf&#39;</span>, <span style="color:#e6db74">&#39;rack&#39;</span>: <span style="color:#e6db74">&#39;149&#39;</span>},
+  <span style="color:#e6db74">&#39;leaf99.neptune&#39;</span>: {<span style="color:#e6db74">&#39;platform&#39;</span>: <span style="color:#e6db74">&#39;acmeos&#39;</span>, <span style="color:#e6db74">&#39;dev_type&#39;</span>: <span style="color:#e6db74">&#39;leaf&#39;</span>, <span style="color:#e6db74">&#39;rack&#39;</span>: <span style="color:#e6db74">&#39;149&#39;</span>}}}
+
+</code></pre></div></section><section>
+<p>Let&rsquo;s try the filtering capabilities:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape>In [<span style="color:#ae81ff">4</span>]: acme<span style="color:#f92672">.</span>get(filter_sites<span style="color:#f92672">=</span>[<span style="color:#e6db74">&#34;earth&#34;</span>], filter_dev_types<span style="color:#f92672">=</span>[<span style="color:#e6db74">&#34;edge&#34;</span>, <span style="color:#e6db74">&#34;spine&#34;</span>])
+Out[<span style="color:#ae81ff">4</span>]:
+{<span style="color:#e6db74">&#39;earth&#39;</span>: {<span style="color:#e6db74">&#39;edge00.earth&#39;</span>: {<span style="color:#e6db74">&#39;platform&#39;</span>: <span style="color:#e6db74">&#39;acmeos&#39;</span>,
+   <span style="color:#e6db74">&#39;dev_type&#39;</span>: <span style="color:#e6db74">&#39;edge&#39;</span>,
+   <span style="color:#e6db74">&#39;rack&#39;</span>: <span style="color:#e6db74">&#39;10&#39;</span>},
+  <span style="color:#e6db74">&#39;edge01.earth&#39;</span>: {<span style="color:#e6db74">&#39;platform&#39;</span>: <span style="color:#e6db74">&#39;acmeos&#39;</span>, <span style="color:#e6db74">&#39;dev_type&#39;</span>: <span style="color:#e6db74">&#39;edge&#39;</span>, <span style="color:#e6db74">&#39;rack&#39;</span>: <span style="color:#e6db74">&#39;10&#39;</span>},
+  <span style="color:#e6db74">&#39;spine00.earth&#39;</span>: {<span style="color:#e6db74">&#39;platform&#39;</span>: <span style="color:#e6db74">&#39;acmeos&#39;</span>, <span style="color:#e6db74">&#39;dev_type&#39;</span>: <span style="color:#e6db74">&#39;spine&#39;</span>, <span style="color:#e6db74">&#39;rack&#39;</span>: <span style="color:#e6db74">&#39;20&#39;</span>},
+  <span style="color:#e6db74">&#39;spine01.earth&#39;</span>: {<span style="color:#e6db74">&#39;platform&#39;</span>: <span style="color:#e6db74">&#39;acmeos&#39;</span>, <span style="color:#e6db74">&#39;dev_type&#39;</span>: <span style="color:#e6db74">&#39;spine&#39;</span>, <span style="color:#e6db74">&#39;rack&#39;</span>: <span style="color:#e6db74">&#39;20&#39;</span>},
+  <span style="color:#e6db74">&#39;spine02.earth&#39;</span>: {<span style="color:#e6db74">&#39;platform&#39;</span>: <span style="color:#e6db74">&#39;acmeos&#39;</span>, <span style="color:#e6db74">&#39;dev_type&#39;</span>: <span style="color:#e6db74">&#39;spine&#39;</span>, <span style="color:#e6db74">&#39;rack&#39;</span>: <span style="color:#e6db74">&#39;21&#39;</span>},
+  <span style="color:#e6db74">&#39;spine03.earth&#39;</span>: {<span style="color:#e6db74">&#39;platform&#39;</span>: <span style="color:#e6db74">&#39;acmeos&#39;</span>, <span style="color:#e6db74">&#39;dev_type&#39;</span>: <span style="color:#e6db74">&#39;spine&#39;</span>, <span style="color:#e6db74">&#39;rack&#39;</span>: <span style="color:#e6db74">&#39;21&#39;</span>}}}
+</code></pre></div><p>Turns out we have:</p>
+<ul>
+<li>8 datacenters</li>
+<li>with:
+<ul>
+<li>2 edge devices each</li>
+<li>4 spines each</li>
+<li>100 ToRs each</li>
+</ul>
+</li>
+</ul>
+<p>The inventory also give us some rack information</p>
+</section><section>
+<p>In order to write our inventory plugin we need to write a plugin that gets the data using the library that was given to us and applies the necessary transformations to create the inventory object.</p>
+<p>Let&rsquo;s look at it step by step:</p>
+</section><section>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#75715e"># nornir3_demo/plugins/inventory/acme.py</span>
+
+<span style="color:#75715e"># we will pretend this library was given to us by a third party</span>
+<span style="color:#f92672">from</span> nornir3_demo.ext.inventory <span style="color:#f92672">import</span> ACMEAPI
+
+
+<span style="color:#66d9ef">class</span> <span style="color:#a6e22e">ACMEInventory</span>:
+    <span style="color:#66d9ef">def</span> __init__(
+        self,
+        filter_sites: Optional[List[str]] <span style="color:#f92672">=</span> None,
+        filter_dev_types: Optional[List[str]] <span style="color:#f92672">=</span> None,
+    ) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#75715e"># we will use the constructor to create the inventory object</span>
+        self<span style="color:#f92672">.</span>conn <span style="color:#f92672">=</span> ACMEAPI()
+
+        <span style="color:#75715e"># we will also save the parameters so we can use them later on</span>
+        self<span style="color:#f92672">.</span>filter_sites <span style="color:#f92672">=</span> filter_sites
+        self<span style="color:#f92672">.</span>filter_dev_types <span style="color:#f92672">=</span> filter_dev_types
+
+    <span style="color:#f92672">...</span>
+</code></pre></div></section><section>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#75715e"># nornir3_demo/plugins/inventory/acme.py</span>
+    <span style="color:#f92672">...</span>
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">load</span>(self) <span style="color:#f92672">-&gt;</span> Inventory:
+        <span style="color:#75715e"># we retrieve the data from the inventory passing the options we saved</span>
+        <span style="color:#75715e"># in he constructor</span>
+        data <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>conn<span style="color:#f92672">.</span>get(self<span style="color:#f92672">.</span>filter_sites, self<span style="color:#f92672">.</span>filter_dev_types)
+        <span style="color:#75715e"># we create placeholder for the hosts and for the groups</span>
+        hosts <span style="color:#f92672">=</span> Hosts()
+        groups <span style="color:#f92672">=</span> Groups()
+
+        <span style="color:#75715e"># the inventory returned the hosts by datacenter so we iterate over them</span>
+        <span style="color:#66d9ef">for</span> dc_name, dc_data <span style="color:#f92672">in</span> data<span style="color:#f92672">.</span>items():
+            <span style="color:#75715e"># we are going to start by creating a group per DC</span>
+            groups[dc_name] <span style="color:#f92672">=</span> Group(dc_name)
+
+            <span style="color:#75715e"># now we process the dc data we got</span>
+            hosts_in_dc <span style="color:#f92672">=</span> process_dc_data(groups[dc_name], dc_data)
+
+            <span style="color:#75715e"># we add the hosts in the dc to the main hosts object</span>
+            hosts<span style="color:#f92672">.</span>update(hosts_in_dc)
+
+        <span style="color:#75715e"># we populate the inventory and return it</span>
+        <span style="color:#75715e"># note our inventory doesn&#39;t support defaults so we just return an empty object</span>
+        <span style="color:#66d9ef">return</span> Inventory(hosts<span style="color:#f92672">=</span>hosts, groups<span style="color:#f92672">=</span>groups, defaults<span style="color:#f92672">=</span>Defaults())
+</code></pre></div></section><section>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#75715e"># nornir3_demo/plugins/inventory/acme.py</span>
+
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">process_dc_data</span>(group: Group, group_data: Dict[str, Dict[str, str]]) <span style="color:#f92672">-&gt;</span> Hosts:
+    <span style="color:#e6db74">&#34;&#34;&#34;
+</span><span style="color:#e6db74">    Arguments:
+</span><span style="color:#e6db74">        group: Current group we are processing
+</span><span style="color:#e6db74">        group_data: the data for the entire group as returned by the backend
+</span><span style="color:#e6db74">    &#34;&#34;&#34;</span>
+    <span style="color:#75715e"># we create a placeholder for the hosts</span>
+    hosts <span style="color:#f92672">=</span> Hosts()
+
+    <span style="color:#75715e"># inside each datacenter we had a dictionary where the key was the hostname</span>
+    <span style="color:#75715e"># and the data inside had some data about it, we iterate over the hosts</span>
+    <span style="color:#66d9ef">for</span> hostname, host_data <span style="color:#f92672">in</span> group_data<span style="color:#f92672">.</span>items():
+        <span style="color:#75715e"># for each host we create a Host object mapping it&#39;s required parameters</span>
+        <span style="color:#75715e"># with the data we got</span>
+        hosts[hostname] <span style="color:#f92672">=</span> Host(
+            name<span style="color:#f92672">=</span>hostname,
+            hostname<span style="color:#f92672">=</span>hostname,
+            platform<span style="color:#f92672">=</span>host_data<span style="color:#f92672">.</span>pop(<span style="color:#e6db74">&#34;platform&#34;</span>),
+            groups<span style="color:#f92672">=</span>ParentGroups([group]),  <span style="color:#75715e"># we add the DC group as a parent group</span>
+            data<span style="color:#f92672">=</span>{<span style="color:#e6db74">&#34;site&#34;</span>: group<span style="color:#f92672">.</span>name, <span style="color:#f92672">**</span>host_data},  <span style="color:#75715e"># extra data</span>
+        )
+    <span style="color:#66d9ef">return</span> hosts
+</code></pre></div></section><section>
+<h2 id="registering-the-inventory-plugin-1">Registering the Inventory Plugin</h2>
+<p>Now that we have the plugin, we need to register it. As we are using <code>poetry</code> in our project that&rsquo;s what we will use to register it:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#75715e"># pyproject.toml</span>
+...
+
+[<span style="color:#a6e22e">tool</span>.<span style="color:#a6e22e">poetry</span>.<span style="color:#a6e22e">plugins</span>.<span style="color:#e6db74">&#34;nornir.plugins.inventory&#34;</span>]
+<span style="color:#e6db74">&#34;ACMEInventory&#34;</span> = <span style="color:#e6db74">&#34;nornir3_demo.plugins.inventory.acme:ACMEInventory&#34;</span>
+
+...
+</code></pre></div></section><section>
+<h2 id="demo-acmes-inventory-plugin">Demo: Acme&rsquo;s Inventory Plugin</h2>
+</section><section>
+<p>Script:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#75715e"># demo/scripts/10_inventory_plugin.py</span>
+<span style="color:#f92672">from</span> pprint <span style="color:#f92672">import</span> pprint
+
+<span style="color:#f92672">from</span> nornir <span style="color:#f92672">import</span> InitNornir
+
+nr <span style="color:#f92672">=</span> InitNornir(inventory<span style="color:#f92672">=</span>{<span style="color:#e6db74">&#34;plugin&#34;</span>: <span style="color:#e6db74">&#34;ACMEInventory&#34;</span>})
+
+pprint(nr<span style="color:#f92672">.</span>inventory<span style="color:#f92672">.</span>groups)
+
+pprint(nr<span style="color:#f92672">.</span>inventory<span style="color:#f92672">.</span>hosts)
+</code></pre></div><p>Output:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape>$ python 10_inventory_plugin.py
+<span style="color:#f92672">{</span><span style="color:#e6db74">&#39;earth&#39;</span>: Group: earth,
+ <span style="color:#e6db74">&#39;jupyter&#39;</span>: Group: jupyter,
+ <span style="color:#e6db74">&#39;mars&#39;</span>: Group: mars,
+ <span style="color:#e6db74">&#39;mercury&#39;</span>: Group: mercury,
+ <span style="color:#e6db74">&#39;neptune&#39;</span>: Group: neptune,
+ ...
+<span style="color:#f92672">{</span><span style="color:#e6db74">&#39;edge00.earth&#39;</span>: Host: edge00.earth,
+ <span style="color:#e6db74">&#39;edge00.jupyter&#39;</span>: Host: edge00.jupyter,
+ <span style="color:#e6db74">&#39;edge00.mars&#39;</span>: Host: edge00.mars,
+ <span style="color:#e6db74">&#39;edge00.mercury&#39;</span>: Host: edge00.mercury,
+ ...
+</code></pre></div></section><section>
+<p>Script:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#75715e"># demo/scripts/10_inventory_plugin_filter.py</span>
+<span style="color:#f92672">from</span> nornir <span style="color:#f92672">import</span> InitNornir
+
+nr <span style="color:#f92672">=</span> InitNornir(
+    inventory<span style="color:#f92672">=</span>{
+        <span style="color:#e6db74">&#34;plugin&#34;</span>: <span style="color:#e6db74">&#34;ACMEInventory&#34;</span>,
+        <span style="color:#e6db74">&#34;options&#34;</span>: {
+            <span style="color:#e6db74">&#34;filter_sites&#34;</span>: [<span style="color:#e6db74">&#34;earth&#34;</span>],
+            <span style="color:#e6db74">&#34;filter_dev_types&#34;</span>: [<span style="color:#e6db74">&#34;spine&#34;</span>, <span style="color:#e6db74">&#34;edge&#34;</span>],
+        },
+    }
+)
+
+<span style="color:#66d9ef">print</span>(nr<span style="color:#f92672">.</span>inventory<span style="color:#f92672">.</span>groups)
+
+<span style="color:#66d9ef">print</span>(nr<span style="color:#f92672">.</span>inventory<span style="color:#f92672">.</span>hosts)
+</code></pre></div><p>Output:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape>$ python 10_inventory_plugin_filter.py
+<span style="color:#f92672">{</span><span style="color:#e6db74">&#39;earth&#39;</span>: Group: earth<span style="color:#f92672">}</span>
+<span style="color:#f92672">{</span><span style="color:#e6db74">&#39;edge00.earth&#39;</span>: Host: edge00.earth,
+ <span style="color:#e6db74">&#39;edge01.earth&#39;</span>: Host: edge01.earth,
+ <span style="color:#e6db74">&#39;spine00.earth&#39;</span>: Host: spine00.earth,
+ <span style="color:#e6db74">&#39;spine01.earth&#39;</span>: Host: spine01.earth,
+ <span style="color:#e6db74">&#39;spine02.earth&#39;</span>: Host: spine02.earth,
+ <span style="color:#e6db74">&#39;spine03.earth&#39;</span>: Host: spine03.earth<span style="color:#f92672">}</span>
+</code></pre></div></section><section>
+<h3 id="questions-so-far">Questions so far?</h3>
+
+</section>
+</section>
+    <section>
+
+<section data-shortcode-section>
+<h2 id="connection-plugins">Connection plugins</h2>
+<p>A connection plugin is a nornir plugin that allows nornir to manage connections with devices</p>
+</section><section>
+<p>It is implemented by writing a class with the following structure:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#f92672">from</span> typing <span style="color:#f92672">import</span> Any, Dict, Optional
+
+<span style="color:#f92672">from</span> nornir.core.configuration <span style="color:#f92672">import</span> Config
+
+
+CONNECTION_NAME <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;my-connection-name&#34;</span>
+
+
+<span style="color:#66d9ef">class</span> <span style="color:#a6e22e">MyPlugin</span>:
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">open</span>(
+        self,
+        hostname: Optional[str],
+        username: Optional[str],
+        password: Optional[str],
+        port: Optional[int],
+        platform: Optional[str],
+        extras: Optional[Dict[str, Any]] <span style="color:#f92672">=</span> None,
+        configuration: Optional[Config] <span style="color:#f92672">=</span> None,
+    ) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#75715e"># we open the connection and save it under self.connection</span>
+        self<span style="color:#f92672">.</span>connection <span style="color:#f92672">=</span> connection
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">close</span>(self) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#75715e"># logic to close the connection</span>
+</code></pre></div></section><section>
+<h2 id="registering-the-connection-plugin">Registering the connection plugin</h2>
+<p>As with the <code>InventoryPlugin</code> we need to register the connection plugin. We can do it in two ways:</p>
+<ol>
+<li>Using <a href="https://setuptools.readthedocs.io/en/latest/setuptools.html#dynamic-discovery-of-services-and-plugins">entrypoints</a></li>
+<li>Programmatically</li>
+</ol>
+</section><section>
+<h3 id="registering-connection-plugins-using-entrypoints">Registering Connection Plugins using Entrypoints</h3>
+<p>Add to your <code>setup.py</code>:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape>setup(
+    <span style="color:#75715e"># ...</span>
+    entry_points<span style="color:#f92672">=</span>{
+      <span style="color:#e6db74">&#34;nornir.plugins.connections&#34;</span>: <span style="color:#e6db74">&#34;connection_name = path.to:ConnectionPlugin&#34;</span>,
+    }
+)
+</code></pre></div><p>Or if using poetry, add to <code>pyproject.toml</code>:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape>[<span style="color:#a6e22e">tool</span>.<span style="color:#a6e22e">poetry</span>.<span style="color:#a6e22e">plugins</span>.<span style="color:#e6db74">&#34;nornir.plugins.connections&#34;</span>]
+<span style="color:#e6db74">&#34;connection_name&#34;</span> = <span style="color:#e6db74">&#34;path.to:ConnectionPlugin&#34;</span>
+</code></pre></div><ul>
+<li><strong><code>connection_name</code></strong> is the name of the connection, you will refer to this plugin by this name when writing tasks</li>
+<li><strong><code>path.to:ConnectionPlugin</code></strong> is the path to the class implementing the plugin</li>
+</ul>
+</section><section>
+<h3 id="registering-connection-plugins-programmatically">Registering Connection Plugins Programmatically</h3>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#f92672">from</span> nornir.core.plugins.connections <span style="color:#f92672">import</span> ConnectionPluginRegister
+
+<span style="color:#f92672">from</span> path.to <span style="color:#f92672">import</span> ConnectionPlugin
+
+
+ConnectionPluginRegister<span style="color:#f92672">.</span>register(<span style="color:#e6db74">&#34;connection-name&#34;</span>, ConnectionPlugin)
+
+</code></pre></div></section><section>
+<h2 id="example-acmeos-connection-plugin">Example: AcmeOS Connection Plugin</h2>
+<p>Our AcmeOS device has a python library we can leverage. In order to manage the connection to the device it provides a constructor and two methods:</p>
+<ul>
+<li><code>AcmeOS(hostname, username, password, port)</code> - Create an instance of the object to interact with a device</li>
+<li><code>open()</code> - Establishes a connection</li>
+<li><code>close()</code> - Closes the connection</li>
+</ul>
+</section><section>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#75715e"># nornir3_demo/plugins/connections/acmeos.py</span>
+
+<span style="color:#75715e"># we will pretend this library was given to us by a third party</span>
+<span style="color:#f92672">from</span> nornir3_demo.ext.acmeos <span style="color:#f92672">import</span> AcmeOSAPI
+
+
+<span style="color:#75715e"># We will use this variable in the tasks to quickly reference the plugin</span>
+CONNECTION_NAME <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;acmeos&#34;</span>
+
+
+<span style="color:#66d9ef">class</span> <span style="color:#a6e22e">AcmeOS</span>:
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">open</span>(<span style="color:#f92672">...</span>) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#75715e"># we use the constructor to pass the parameters needed by the library</span>
+        connection <span style="color:#f92672">=</span> AcmeOSAPI(hostname, username, password, port)
+
+        <span style="color:#75715e"># now we call the open method as instructed by the library documentation</span>
+        connection<span style="color:#f92672">.</span>open()
+
+        <span style="color:#75715e"># finally we save the connection under self.connection as instructed by nornir</span>
+        self<span style="color:#f92672">.</span>connection <span style="color:#f92672">=</span> connection
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">close</span>(self) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#75715e"># we follow the instructions provided by the library to close the connection</span>
+        self<span style="color:#f92672">.</span>connection<span style="color:#f92672">.</span>close()
+</code></pre></div></section><section>
+<p>Now that we have the plugin, we need to register it. As we are using <code>poetry</code> in our project that&rsquo;s what we will use to register it:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#75715e"># pyproject.toml</span>
+...
+
+[<span style="color:#a6e22e">tool</span>.<span style="color:#a6e22e">poetry</span>.<span style="color:#a6e22e">plugins</span>.<span style="color:#e6db74">&#34;nornir.plugins.connections&#34;</span>]
+<span style="color:#e6db74">&#34;acmeos&#34;</span> = <span style="color:#e6db74">&#34;nornir3_demo.plugins.connections.acmeos:AcmeOS&#34;</span>
+
+...
+</code></pre></div></section><section>
+<p>Now we are ready to write a few tasks that will leverage this connection plugin.</p>
+<p>Let&rsquo;s start by looking at the vendor&rsquo;s documentation, according to it we have a few methods that are interesting to us:</p>
+<ul>
+<li><strong><code>get_version()</code></strong> - Returns a dictionary with OS information</li>
+<li><strong><code>get_cpu_ram()</code></strong> - Returns a dictionary with information about cpu and ram usage</li>
+<li><strong><code>install_os_version(version: str)</code></strong> - Installs the given version of the device&rsquo;s operating system</li>
+</ul>
+</section><section>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#75715e"># nornir3_demo/plugins/tasks/acmeos/__init__.py</span>
+
+<span style="color:#f92672">from</span> nornir.core.task <span style="color:#f92672">import</span> Result, Task
+
+<span style="color:#75715e"># We import the CONNECTION_NAME from the plugin itself</span>
+<span style="color:#f92672">from</span> nornir3_demo.plugins.connections.acmeos <span style="color:#f92672">import</span> CONNECTION_NAME
+
+
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">get_version</span>(task: Task) <span style="color:#f92672">-&gt;</span> Result:
+    <span style="color:#75715e"># nornir manages the connection automatically using the Connection plugin</span>
+    <span style="color:#75715e"># To retrieve it you can just call the following method. Note that</span>
+    <span style="color:#75715e"># CONNETION_NAME needs to match the name we used when registering the plugin</span>
+    device <span style="color:#f92672">=</span> task<span style="color:#f92672">.</span>host<span style="color:#f92672">.</span>get_connection(CONNECTION_NAME, task<span style="color:#f92672">.</span>nornir<span style="color:#f92672">.</span>config)
+
+    <span style="color:#75715e"># now we are ready to use the library given to us by the vendor</span>
+    version_info <span style="color:#f92672">=</span> device<span style="color:#f92672">.</span>get_version()
+
+    <span style="color:#66d9ef">return</span> Result(host<span style="color:#f92672">=</span>task<span style="color:#f92672">.</span>host, result<span style="color:#f92672">=</span>version_info)
+
+</code></pre></div></section><section>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#75715e"># nornir3_demo/plugins/tasks/acmeos/__init__.py</span>
+<span style="color:#75715e">#</span>
+<span style="color:#75715e"># continuation...</span>
+
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">get_cpu_ram</span>(task: Task) <span style="color:#f92672">-&gt;</span> Result:
+    device <span style="color:#f92672">=</span> task<span style="color:#f92672">.</span>host<span style="color:#f92672">.</span>get_connection(CONNECTION_NAME, task<span style="color:#f92672">.</span>nornir<span style="color:#f92672">.</span>config)
+    <span style="color:#66d9ef">return</span> Result(host<span style="color:#f92672">=</span>task<span style="color:#f92672">.</span>host, result<span style="color:#f92672">=</span>device<span style="color:#f92672">.</span>get_cpu_ram())
+
+
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">install_os_version</span>(task: Task, version: str) <span style="color:#f92672">-&gt;</span> Result:
+    device <span style="color:#f92672">=</span> task<span style="color:#f92672">.</span>host<span style="color:#f92672">.</span>get_connection(CONNECTION_NAME, task<span style="color:#f92672">.</span>nornir<span style="color:#f92672">.</span>config)
+
+    <span style="color:#75715e"># note that we set changed=True as we changed the system</span>
+    <span style="color:#66d9ef">return</span> Result(
+        host<span style="color:#f92672">=</span>task<span style="color:#f92672">.</span>host, result<span style="color:#f92672">=</span>device<span style="color:#f92672">.</span>install_os_version(version), changed<span style="color:#f92672">=</span>True
+    )
+</code></pre></div></section><section>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#75715e"># nornir3_demo/plugins/tasks/acmeos/__init__.py</span>
+<span style="color:#75715e">#</span>
+<span style="color:#75715e"># continuation...</span>
+
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">upgrade_os</span>(task: Task, version: str) <span style="color:#f92672">-&gt;</span> Result:
+    <span style="color:#75715e"># we use task get_verion to retrieve current OS running</span>
+    result <span style="color:#f92672">=</span> task<span style="color:#f92672">.</span>run(task<span style="color:#f92672">=</span>get_version)
+
+    <span style="color:#75715e"># if the version matches what we want to install we are done!</span>
+    <span style="color:#66d9ef">if</span> result<span style="color:#f92672">.</span>result[<span style="color:#e6db74">&#34;full_version&#34;</span>] <span style="color:#f92672">==</span> version:
+        <span style="color:#66d9ef">return</span> Result(host<span style="color:#f92672">=</span>task<span style="color:#f92672">.</span>host, result<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;nothing to do!!!&#34;</span>)
+
+    <span style="color:#75715e"># otherwise we call install_os_version task to install the image</span>
+    task<span style="color:#f92672">.</span>run(task<span style="color:#f92672">=</span>install_os_version, version<span style="color:#f92672">=</span>version)
+    <span style="color:#66d9ef">return</span> Result(host<span style="color:#f92672">=</span>task<span style="color:#f92672">.</span>host, changed<span style="color:#f92672">=</span>True, result<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;success!!!&#34;</span>)
+</code></pre></div></section><section>
+<h2 id="demo-acmeos-connection-plugin">Demo: AcmeOS Connection Plugin</h2>
+</section><section>
+<p>Script:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#75715e"># demo/scripts/20_connection_plugin.py</span>
+<span style="color:#f92672">from</span> nornir <span style="color:#f92672">import</span> InitNornir
+
+<span style="color:#f92672">from</span> nornir3_demo.plugins.tasks <span style="color:#f92672">import</span> acmeos
+
+nr <span style="color:#f92672">=</span> InitNornir(
+    inventory<span style="color:#f92672">=</span>{<span style="color:#e6db74">&#34;plugin&#34;</span>: <span style="color:#e6db74">&#34;ACMEInventory&#34;</span>, <span style="color:#e6db74">&#34;options&#34;</span>: {<span style="color:#e6db74">&#34;filter_sites&#34;</span>: [<span style="color:#e6db74">&#34;earth&#34;</span>]}}
+)
+
+
+results <span style="color:#f92672">=</span> nr<span style="color:#f92672">.</span>run(task<span style="color:#f92672">=</span>acmeos<span style="color:#f92672">.</span>get_version)
+
+<span style="color:#66d9ef">for</span> hostname, result <span style="color:#f92672">in</span> results<span style="color:#f92672">.</span>items():
+    <span style="color:#66d9ef">if</span> result<span style="color:#f92672">.</span>failed:
+        <span style="color:#66d9ef">print</span>(f<span style="color:#e6db74">&#34;{hostname}: {result.exception}&#34;</span>)
+    <span style="color:#66d9ef">else</span>:
+        <span style="color:#66d9ef">print</span>(f<span style="color:#e6db74">&#34;{hostname}: {result.result[&#39;full_version&#39;]}&#34;</span>)
+</code></pre></div><p>Output:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape>$ python 20_connection_plugin.py
+edge00.earth: problem communicating with device
+edge01.earth: 5.4.1
+spine00.earth: 5.2.1
+spine01.earth: 5.2.4
+spine02.earth: 5.1.3
+spine03.earth: 5.2.9
+leaf00.earth: 5.2.3
+leaf01.earth: 5.4.1
+leaf02.earth: 5.2.7
+...
+</code></pre></div></section><section>
+<h3 id="questions-so-far">Questions so far?</h3>
+
+</section>
+</section>
+    <section>
+
+<section data-shortcode-section>
+<h2 id="processors">Processors</h2>
+<p>A processor is a plugin that taps into certain events and allows the user to execute arbitrary code on those events.</p>
+<p>Those events are:</p>
+<ol>
+<li>When a task starts or finishes</li>
+<li>When a host starts executing the task or completes it</li>
+<li>When a host starts executing a subtasks or completes it</li>
+</ol>
+</section><section>
+<p>The benefit of using a <code>Processor</code> is that the code for each event is called as they occur so you can execute arbitrary code without having to wait until the entire task is completed</p>
+</section><section>
+<p>It is implemented by writing a class with the following structure:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#f92672">from</span> nornir.core.inventory <span style="color:#f92672">import</span> Host
+<span style="color:#f92672">from</span> nornir.core.task <span style="color:#f92672">import</span> AggregatedResult, MultiResult, Task
+
+
+<span style="color:#66d9ef">class</span> <span style="color:#a6e22e">MyProcessorPlugin</span>:
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">task_started</span>(self, task: Task) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#f92672">...</span>
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">task_completed</span>(self, task: Task, result: AggregatedResult) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#f92672">...</span>
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">task_instance_started</span>(self, task: Task, host: Host) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#f92672">...</span>
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">task_instance_completed</span>(self, task: Task, host: Host, results: MultiResult) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#f92672">...</span>
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">subtask_instance_started</span>(self, task: Task, host: Host) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#f92672">...</span>
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">subtask_instance_completed</span>(
+        self, task: Task, host: Host, result: MultiResult
+    ) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#f92672">...</span>
+</code></pre></div></section><section>
+<h3 id="example-rich-progress-bar">Example: rich progress bar</h3>
+<p>ACME has +800 devices so we are going to write a progress bar that will shows the progress of the execution in real time while we wait for everything to complete</p>
+<p>Note: this plugin leverages <a href="https://github.com/willmcgugan/rich">rich</a></p>
+</section><section>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#75715e"># nornir3_demo/plugins/processors/rich.py</span>
+
+<span style="color:#66d9ef">class</span> <span style="color:#a6e22e">ProgressBar</span>:
+    <span style="color:#66d9ef">def</span> __init__(self, total: int) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#75715e"># we will need to inform this processor the total amount of hosts</span>
+        <span style="color:#75715e"># we instantiate a progress bar object</span>
+        self<span style="color:#f92672">.</span>progress <span style="color:#f92672">=</span> Progress(
+            <span style="color:#e6db74">&#34;[progress.description]{task.description}&#34;</span>,
+            BarColumn(),
+            <span style="color:#e6db74">&#34;[progress.percentage]{task.completed:&gt;3.0f}/{task.total}&#34;</span>,
+        )
+
+        <span style="color:#75715e"># we create four progress bars to track total execution, successes, errors and changes</span>
+        self<span style="color:#f92672">.</span>total <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>progress<span style="color:#f92672">.</span>add_task(<span style="color:#e6db74">&#34;[cyan]Completed...&#34;</span>, total<span style="color:#f92672">=</span>total)
+        self<span style="color:#f92672">.</span>successful <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>progress<span style="color:#f92672">.</span>add_task(<span style="color:#e6db74">&#34;[green]Successful...&#34;</span>, total<span style="color:#f92672">=</span>total)
+        self<span style="color:#f92672">.</span>changed <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>progress<span style="color:#f92672">.</span>add_task(<span style="color:#e6db74">&#34;[orange3]Changed...&#34;</span>, total<span style="color:#f92672">=</span>total)
+        self<span style="color:#f92672">.</span>error <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>progress<span style="color:#f92672">.</span>add_task(<span style="color:#e6db74">&#34;[red]Failed...&#34;</span>, total<span style="color:#f92672">=</span>total)
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">task_started</span>(self, task: Task) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#75715e"># we start the progress bar</span>
+        self<span style="color:#f92672">.</span>progress<span style="color:#f92672">.</span>start()
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">task_completed</span>(self, task: Task, result: AggregatedResult) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#75715e"># we stop the progress bar</span>
+        self<span style="color:#f92672">.</span>progress<span style="color:#f92672">.</span>stop()
+</code></pre></div></section><section>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#75715e"># nornir3_demo/plugins/processors/rich.py (continuation)</span>
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">task_instance_started</span>(self, task: Task, host: Host) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#66d9ef">pass</span>
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">task_instance_completed</span>(self, task: Task, host: Host, results: MultiResult) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#75715e"># we upgrade total execution advancing 1</span>
+        self<span style="color:#f92672">.</span>progress<span style="color:#f92672">.</span>update(self<span style="color:#f92672">.</span>total, advance<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>)
+        <span style="color:#66d9ef">if</span> results<span style="color:#f92672">.</span>failed:
+            <span style="color:#75715e"># if the task failed we increase the progress bar counting errors</span>
+            self<span style="color:#f92672">.</span>progress<span style="color:#f92672">.</span>update(self<span style="color:#f92672">.</span>error, advance<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>)
+        <span style="color:#66d9ef">else</span>:
+            <span style="color:#75715e"># if the task succeeded we increase the progress bar counting successes</span>
+            self<span style="color:#f92672">.</span>progress<span style="color:#f92672">.</span>update(self<span style="color:#f92672">.</span>successful, advance<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>)
+
+        <span style="color:#66d9ef">if</span> results<span style="color:#f92672">.</span>changed:
+            <span style="color:#75715e"># if the task changed the device we increase the progress bar counting changes</span>
+            self<span style="color:#f92672">.</span>progress<span style="color:#f92672">.</span>update(self<span style="color:#f92672">.</span>changed, advance<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>)
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">subtask_instance_started</span>(self, task: Task, host: Host) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#66d9ef">pass</span>
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">subtask_instance_completed</span>(self, task: Task, host: Host, result: MultiResult) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#66d9ef">pass</span>
+</code></pre></div></section><section>
+<h3 id="demo-rich-progress-bar">Demo: rich progress bar</h3>
+<p>Script:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#75715e"># demo/scripts/30_progress_bar.py</span>
+
+<span style="color:#f92672">from</span> nornir <span style="color:#f92672">import</span> InitNornir
+
+<span style="color:#f92672">from</span> nornir3_demo.plugins.tasks <span style="color:#f92672">import</span> acmeos
+<span style="color:#f92672">from</span> nornir3_demo.plugins.processors.rich <span style="color:#f92672">import</span> ProgressBar
+
+nr <span style="color:#f92672">=</span> InitNornir(inventory<span style="color:#f92672">=</span>{<span style="color:#e6db74">&#34;plugin&#34;</span>: <span style="color:#e6db74">&#34;ACMEInventory&#34;</span>})
+
+total_hosts <span style="color:#f92672">=</span> len(nr<span style="color:#f92672">.</span>inventory<span style="color:#f92672">.</span>hosts)
+
+nr_with_progress_bar <span style="color:#f92672">=</span> nr<span style="color:#f92672">.</span>with_processors([ProgressBar(total_hosts)])
+
+nr_with_progress_bar<span style="color:#f92672">.</span>run(task<span style="color:#f92672">=</span>acmeos<span style="color:#f92672">.</span>upgrade_os, version<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;5.3.2&#34;</span>)
+</code></pre></div></section><section>
+<figure>
+    <img src="img/progress_bar_1.png"
+         alt="progress bar" width="60%"/> 
+</figure>
+<p>(a few seconds later)</p>
+<figure>
+    <img src="img/progress_bar_2.png"
+         alt="progress bar" width="60%"/> 
+</figure>
+<p>(on completion)</p>
+<figure>
+    <img src="img/progress_bar_3.png"
+         alt="progress bar" width="60%"/> 
+</figure>
+</section><section>
+<h3 id="example-custom-logging">Example: custom logging</h3>
+<p>In addition to our fancy progress bar we are going to add a logging processor so we can inspect the execution as it happens. We are going to log to a file but ideally we&rsquo;d be using this to a syslog server connected to a system like splunk, graylog or to an ELK stack.</p>
+</section><section>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#75715e"># nornir3_demo/plugins/processors/logger.py</span>
+
+<span style="color:#f92672">import</span> uuid
+
+<span style="color:#f92672">from</span> nornir.core.inventory <span style="color:#f92672">import</span> Host
+<span style="color:#f92672">from</span> nornir.core.task <span style="color:#f92672">import</span> AggregatedResult, MultiResult, Task
+
+
+<span style="color:#f92672">import</span> logging
+
+
+<span style="color:#66d9ef">class</span> <span style="color:#a6e22e">Logger</span>:
+    <span style="color:#66d9ef">def</span> __init__(self, filename: str, log_level: int <span style="color:#f92672">=</span> logging<span style="color:#f92672">.</span>INFO) <span style="color:#f92672">-&gt;</span> None:
+        self<span style="color:#f92672">.</span>logger <span style="color:#f92672">=</span> logging<span style="color:#f92672">.</span>getLogger(<span style="color:#e6db74">&#34;nornir_runner_logger&#34;</span>)
+
+        handler <span style="color:#f92672">=</span> logging<span style="color:#f92672">.</span>FileHandler(filename<span style="color:#f92672">=</span>filename)
+        formatter <span style="color:#f92672">=</span> logging<span style="color:#f92672">.</span>Formatter(<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">%(levelname)s</span><span style="color:#e6db74">:</span><span style="color:#e6db74">%(asctime)s</span><span style="color:#e6db74">:</span><span style="color:#e6db74">%(message)s</span><span style="color:#e6db74">&#34;</span>)
+        handler<span style="color:#f92672">.</span>setFormatter(formatter)
+
+        self<span style="color:#f92672">.</span>logger<span style="color:#f92672">.</span>setLevel(log_level)
+
+        self<span style="color:#f92672">.</span>logger<span style="color:#f92672">.</span>addHandler(handler)
+</code></pre></div></section><section>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">task_started</span>(self, task: Task) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#75715e"># we generate a unique uuid and attach it to all the logs</span>
+        <span style="color:#75715e"># this unique uuid will allow us to correlate logs and filter them by task execution</span>
+        self<span style="color:#f92672">.</span>uuid <span style="color:#f92672">=</span> uuid<span style="color:#f92672">.</span>uuid4()
+        self<span style="color:#f92672">.</span>logger<span style="color:#f92672">.</span>info(<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">:starting  task:</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">&#34;</span>, self<span style="color:#f92672">.</span>uuid, task<span style="color:#f92672">.</span>name)
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">task_completed</span>(self, task: Task, result: AggregatedResult) <span style="color:#f92672">-&gt;</span> None:
+        self<span style="color:#f92672">.</span>logger<span style="color:#f92672">.</span>info(<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">:completed task:</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">&#34;</span>, self<span style="color:#f92672">.</span>uuid, task<span style="color:#f92672">.</span>name)
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">task_instance_started</span>(self, task: Task, host: Host) <span style="color:#f92672">-&gt;</span> None:
+        self<span style="color:#f92672">.</span>logger<span style="color:#f92672">.</span>info(<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">:starting  host:</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">&#34;</span>, self<span style="color:#f92672">.</span>uuid, task<span style="color:#f92672">.</span>host<span style="color:#f92672">.</span>name)
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">task_instance_completed</span>(
+        self, task: Task, host: Host, results: MultiResult
+    ) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#66d9ef">if</span> results<span style="color:#f92672">.</span>failed:
+            self<span style="color:#f92672">.</span>logger<span style="color:#f92672">.</span>error(<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">:completed host:</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">:</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">&#34;</span>, self<span style="color:#f92672">.</span>uuid, task<span style="color:#f92672">.</span>host<span style="color:#f92672">.</span>name, results[<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>]<span style="color:#f92672">.</span>exception)
+        <span style="color:#66d9ef">else</span>:
+            self<span style="color:#f92672">.</span>logger<span style="color:#f92672">.</span>info(
+                <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">:completed host:</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">:</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">&#34;</span>, self<span style="color:#f92672">.</span>uuid, task<span style="color:#f92672">.</span>host<span style="color:#f92672">.</span>name, results<span style="color:#f92672">.</span>result
+            )
+</code></pre></div></section><section>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">subtask_instance_started</span>(self, task: Task, host: Host) <span style="color:#f92672">-&gt;</span> None:
+        self<span style="color:#f92672">.</span>logger<span style="color:#f92672">.</span>debug(
+            <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">:starting  subtask:</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">:</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">&#34;</span>, self<span style="color:#f92672">.</span>uuid, task<span style="color:#f92672">.</span>host<span style="color:#f92672">.</span>name, task<span style="color:#f92672">.</span>name
+        )
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">subtask_instance_completed</span>(
+        self, task: Task, host: Host, result: MultiResult
+    ) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#66d9ef">if</span> result<span style="color:#f92672">.</span>failed:
+            self<span style="color:#f92672">.</span>logger<span style="color:#f92672">.</span>error(
+                <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">:completed subtask:</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">:</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">:</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">&#34;</span>,
+                self<span style="color:#f92672">.</span>uuid,
+                task<span style="color:#f92672">.</span>host<span style="color:#f92672">.</span>name,
+                task<span style="color:#f92672">.</span>name,
+                result<span style="color:#f92672">.</span>exception,
+            )
+        <span style="color:#66d9ef">else</span>:
+            self<span style="color:#f92672">.</span>logger<span style="color:#f92672">.</span>debug(
+                <span style="color:#e6db74">&#34;</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">:completed subtask:</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">:</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">:</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">&#34;</span>,
+                self<span style="color:#f92672">.</span>uuid,
+                task<span style="color:#f92672">.</span>host<span style="color:#f92672">.</span>name,
+                task<span style="color:#f92672">.</span>name,
+                result<span style="color:#f92672">.</span>result,
+            )
+</code></pre></div></section><section>
+<p>Script:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#f92672">import</span> logging
+
+<span style="color:#f92672">from</span> nornir <span style="color:#f92672">import</span> InitNornir
+
+<span style="color:#f92672">from</span> nornir3_demo.plugins.tasks <span style="color:#f92672">import</span> acmeos
+<span style="color:#f92672">from</span> nornir3_demo.plugins.processors.logger <span style="color:#f92672">import</span> Logger
+<span style="color:#f92672">from</span> nornir3_demo.plugins.processors.rich <span style="color:#f92672">import</span> ProgressBar
+
+nr <span style="color:#f92672">=</span> InitNornir(inventory<span style="color:#f92672">=</span>{<span style="color:#e6db74">&#34;plugin&#34;</span>: <span style="color:#e6db74">&#34;ACMEInventory&#34;</span>})
+
+total_hosts <span style="color:#f92672">=</span> len(nr<span style="color:#f92672">.</span>inventory<span style="color:#f92672">.</span>hosts)
+
+<span style="color:#75715e"># We can run as many procressors at the same time as we want!!!</span>
+nr_with_progress_bar_and_logs <span style="color:#f92672">=</span> nr<span style="color:#f92672">.</span>with_processors(
+    [ProgressBar(total_hosts), Logger(<span style="color:#e6db74">&#34;upgrade_os.log&#34;</span>, log_level<span style="color:#f92672">=</span>logging<span style="color:#f92672">.</span>DEBUG)]
+)
+
+nr_with_progress_bar_and_logs<span style="color:#f92672">.</span>run(task<span style="color:#f92672">=</span>acmeos<span style="color:#f92672">.</span>upgrade_os, version<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;5.3.2&#34;</span>)
+</code></pre></div></section><section>
+<p>Output while executing <code>python 31_progress_bar_and_logs.py</code>:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape>$ tail -f upgrade_os.log
+...
+DEBUG:2020-06-09 20:23:10,331:bd566653-13f4-47a6-8350-a98301cc9eef:starting  subtask:edge00.earth:install_os_version
+DEBUG:2020-06-09 20:23:10,406:bd566653-13f4-47a6-8350-a98301cc9eef:completed host:leaf90.venus:install_os_version:<span style="color:#f92672">{</span><span style="color:#e6db74">&#39;os_version&#39;</span>: <span style="color:#e6db74">&#39;5.3&#39;</span>, <span style="color:#e6db74">&#39;revision&#39;</span>: <span style="color:#e6db74">&#39;2&#39;</span>, <span style="color:#e6db74">&#39;full_version&#39;</span>: <span style="color:#e6db74">&#39;5.3.2&#39;</span><span style="color:#f92672">}</span>
+INFO:2020-06-09 20:23:10,406:bd566653-13f4-47a6-8350-a98301cc9eef:completed host:leaf90.venus:success!!!
+INFO:2020-06-09 20:23:10,406:bd566653-13f4-47a6-8350-a98301cc9eef:starting  host:leaf04.earth
+DEBUG:2020-06-09 20:23:10,406:bd566653-13f4-47a6-8350-a98301cc9eef:starting  subtask:leaf04.earth:get_version
+DEBUG:2020-06-09 20:23:10,462:bd566653-13f4-47a6-8350-a98301cc9eef:completed host:leaf89.venus:install_os_version:<span style="color:#f92672">{</span><span style="color:#e6db74">&#39;os_version&#39;</span>: <span style="color:#e6db74">&#39;5.3&#39;</span>, <span style="color:#e6db74">&#39;revision&#39;</span>: <span style="color:#e6db74">&#39;2&#39;</span>, <span style="color:#e6db74">&#39;full_version&#39;</span>: <span style="color:#e6db74">&#39;5.3.2&#39;</span><span style="color:#f92672">}</span>
+INFO:2020-06-09 20:23:10,463:bd566653-13f4-47a6-8350-a98301cc9eef:completed host:leaf89.venus:success!!!
+INFO:2020-06-09 20:23:10,463:bd566653-13f4-47a6-8350-a98301cc9eef:starting  host:leaf05.earth
+DEBUG:2020-06-09 20:23:10,463:bd566653-13f4-47a6-8350-a98301cc9eef:starting  subtask:leaf05.earth:get_version
+DEBUG:2020-06-09 20:23:10,521:bd566653-13f4-47a6-8350-a98301cc9eef:completed host:edge01.earth:get_version:<span style="color:#f92672">{</span><span style="color:#e6db74">&#39;os_version&#39;</span>: <span style="color:#e6db74">&#39;5.1&#39;</span>, <span style="color:#e6db74">&#39;revision&#39;</span>: <span style="color:#e6db74">&#39;5&#39;</span>, <span style="color:#e6db74">&#39;full_version&#39;</span>: <span style="color:#e6db74">&#39;5.1.5&#39;</span><span style="color:#f92672">}</span>
+DEBUG:2020-06-09 20:23:10,521:bd566653-13f4-47a6-8350-a98301cc9eef:starting  subtask:edge01.earth:install_os_version
+DEBUG:2020-06-09 20:23:10,560:bd566653-13f4-47a6-8350-a98301cc9eef:completed host:leaf95.venus:get_version:<span style="color:#f92672">{</span><span style="color:#e6db74">&#39;os_version&#39;</span>: <span style="color:#e6db74">&#39;5.2&#39;</span>, <span style="color:#e6db74">&#39;revision&#39;</span>: <span style="color:#e6db74">&#39;7&#39;</span>, <span style="color:#e6db74">&#39;full_version&#39;</span>: <span style="color:#e6db74">&#39;5.2.7&#39;</span><span style="color:#f92672">}</span>
+DEBUG:2020-06-09 20:23:10,560:bd566653-13f4-47a6-8350-a98301cc9eef:starting  subtask:leaf95.venus:install_os_version
+DEBUG:2020-06-09 20:23:10,691:bd566653-13f4-47a6-8350-a98301cc9eef:completed host:leaf93.venus:get_version:<span style="color:#f92672">{</span><span style="color:#e6db74">&#39;os_version&#39;</span>: <span style="color:#e6db74">&#39;5.3&#39;</span>, <span style="color:#e6db74">&#39;revision&#39;</span>: <span style="color:#e6db74">&#39;6&#39;</span>, <span style="color:#e6db74">&#39;full_version&#39;</span>: <span style="color:#e6db74">&#39;5.3.6&#39;</span><span style="color:#f92672">}</span>
+DEBUG:2020-06-09 20:23:10,691:bd566653-13f4-47a6-8350-a98301cc9eef:starting  subtask:leaf93.venus:install_os_version
+DEBUG:2020-06-09 20:23:10,715:bd566653-13f4-47a6-8350-a98301cc9eef:completed host:leaf87.venus:install_os_version:<span style="color:#f92672">{</span><span style="color:#e6db74">&#39;os_version&#39;</span>: <span style="color:#e6db74">&#39;5.3&#39;</span>, <span style="color:#e6db74">&#39;revision&#39;</span>: <span style="color:#e6db74">&#39;2&#39;</span>, <span style="color:#e6db74">&#39;full_version&#39;</span>: <span style="color:#e6db74">&#39;5.3.2&#39;</span><span style="color:#f92672">}</span>
+...
+</code></pre></div></section><section>
+<h3 id="questions-so-far">Questions so far?</h3>
+
+</section>
+</section>
+    <section>
+
+<section data-shortcode-section>
+<h2 id="runners">Runners</h2>
+<p>A runner is a plugin that dictates how to execute the tasks over the hosts</p>
+</section><section>
+<p>Nornir comes with two runners:</p>
+<ul>
+<li><strong><code>SerialRunner</code></strong> executes the task over all the hosts one after the other</li>
+<li><strong><code>ThreadedRunner</code></strong> executes the task over all the hosts in parallel using threads (default)</li>
+</ul>
+</section><section>
+<p>You can implement a runner by writing a class with the following structure:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">DCAwareRunner</span>:
+    <span style="color:#66d9ef">def</span> __init__(self, <span style="color:#f92672">*</span>args: Any, <span style="color:#f92672">**</span>kwargs: Any) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#75715e"># This method will allow you to configure the plugin</span>
+        <span style="color:#75715e"># For instance, when creating the object runner.options will be passed</span>
+        <span style="color:#75715e"># to this constructor</span>
+        <span style="color:#f92672">...</span>
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">run</span>(self, task: Task, hosts: List[Host]) <span style="color:#f92672">-&gt;</span> AggregatedResult:
+        <span style="color:#75715e"># here is where you would implement your logic to &#34;spread&#34; the task over the hosts</span>
+</code></pre></div></section><section>
+<h2 id="registering-the-runner">Registering the runner</h2>
+<p>As with the <code>InventoryPlugin</code> and the <code>ConnectionPlugin</code> we need to register the runner. We can do it in two ways:</p>
+<ol>
+<li>Using <a href="https://setuptools.readthedocs.io/en/latest/setuptools.html#dynamic-discovery-of-services-and-plugins">entrypoints</a></li>
+<li>Programmatically</li>
+</ol>
+</section><section>
+<h3 id="registering-runner-plugins-using-entrypoints">Registering Runner Plugins using Entrypoints</h3>
+<p>Add to your <code>setup.py</code>:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape>setup(
+    <span style="color:#75715e"># ...</span>
+    entry_points<span style="color:#f92672">=</span>{
+      <span style="color:#e6db74">&#34;nornir.plugins.runners&#34;</span>: <span style="color:#e6db74">&#34;runner_name = path.to:RunnerPlugin&#34;</span>,
+    }
+)
+</code></pre></div><p>Or if using poetry, add to <code>pyproject.toml</code>:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape>[<span style="color:#a6e22e">tool</span>.<span style="color:#a6e22e">poetry</span>.<span style="color:#a6e22e">plugins</span>.<span style="color:#e6db74">&#34;nornir.plugins.runners&#34;</span>]
+<span style="color:#e6db74">&#34;runner_name&#34;</span> = <span style="color:#e6db74">&#34;path.to:RunnerPlugin&#34;</span>
+</code></pre></div><ul>
+<li><strong><code>runner_name</code></strong> is the name of the runner, you will refer to this plugin by this name when writing tasks</li>
+<li><strong><code>path.to:RunnerPlugin</code></strong> is the path to the class implementing the plugin</li>
+</ul>
+</section><section>
+<h3 id="example-dcawarerunner">Example: DCAwareRunner</h3>
+<p>As we have seen already Acme has 8 datacenters with 2 edge devices, 4 spines and 50 racks with two ToRs each. The way the network is designed allows us to lose an edge device, a spine or even a ToR on each rack without impacting normal operations.</p>
+</section><section>
+<p>To perform operations at scale in our network we are going to design a runner that takes these properties into account. To do that we are going to do the following:</p>
+<ol>
+<li>We are going to group our devices based on their redundancy group</li>
+<li>Those groups will be independent between datacenters (i.e. losing an edge in dc A doesn&rsquo;t have an impact on dc B)</li>
+<li>Those groups will be:
+<ol>
+<li>One for all the edge devices</li>
+<li>One for all the spines</li>
+<li>One for each pair of ToRs</li>
+<li>This means each DC will have 50 ToR groups + 1 edge group + 1 spine group</li>
+</ol>
+</li>
+<li>We will parallelize all the groups but only one device of each group will be run at a time</li>
+<li>If a device in a group fails, pending devices in the same group will NOT be executed</li>
+</ol>
+</section><section>
+<p>Code is not too complex but it&rsquo;s rather large so I&rsquo;d encourage you to look at it directly on <a href="https://github.com/nornir-automation/nornir3_demo/blob/master/nornir3_demo/plugins/runners/dc_aware.py">github</a></p>
+</section><section>
+<p>Now that we have the plugin, we need to register it. As we are using <code>poetry</code> in our project that&rsquo;s what we will use to register it:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#75715e"># pyproject.toml</span>
+...
+
+[<span style="color:#a6e22e">tool</span>.<span style="color:#a6e22e">poetry</span>.<span style="color:#a6e22e">plugins</span>.<span style="color:#e6db74">&#34;nornir.plugins.runners&#34;</span>]
+<span style="color:#e6db74">&#34;DCAwareRunner&#34;</span> = <span style="color:#e6db74">&#34;nornir3_demo.plugins.runners.dc_aware:DCAwareRunner&#34;</span>
+
+...
+</code></pre></div></section><section>
+<h3 id="demo-dcawarerunner">Demo: DCAwareRunner</h3>
+<p>Script:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#f92672">from</span> nornir <span style="color:#f92672">import</span> InitNornir
+
+<span style="color:#f92672">from</span> nornir3_demo.plugins.processors.rich <span style="color:#f92672">import</span> ProgressBar
+<span style="color:#f92672">from</span> nornir3_demo.plugins.runners <span style="color:#f92672">import</span> DCAwareRunner
+<span style="color:#f92672">from</span> nornir3_demo.plugins.tasks <span style="color:#f92672">import</span> acmeos
+
+nr <span style="color:#f92672">=</span> InitNornir(inventory<span style="color:#f92672">=</span>{<span style="color:#e6db74">&#34;plugin&#34;</span>: <span style="color:#e6db74">&#34;ACMEInventory&#34;</span>})
+
+total_hosts <span style="color:#f92672">=</span> len(nr<span style="color:#f92672">.</span>inventory<span style="color:#f92672">.</span>hosts)
+nr <span style="color:#f92672">=</span> nr<span style="color:#f92672">.</span>with_processors([ProgressBar(total_hosts)])
+
+dc_runner <span style="color:#f92672">=</span> DCAwareRunner(num_workers<span style="color:#f92672">=</span><span style="color:#ae81ff">100</span>)
+nr <span style="color:#f92672">=</span> nr<span style="color:#f92672">.</span>with_runner(dc_runner)
+
+nr<span style="color:#f92672">.</span>run(task<span style="color:#f92672">=</span>acmeos<span style="color:#f92672">.</span>upgrade_os, version<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;5.3.1&#34;</span>)
+
+<span style="color:#75715e"># let&#39;s print the report so we can see which hosts failed and which ones were skipped</span>
+<span style="color:#66d9ef">print</span>()
+<span style="color:#66d9ef">for</span> data <span style="color:#f92672">in</span> dc_runner<span style="color:#f92672">.</span>report():
+    <span style="color:#66d9ef">print</span>(data)
+</code></pre></div></section><section>
+<p>Output:</p>
+<figure>
+    <img src="img/dc_aware.png"
+         alt="dc aware"/> 
+</figure>
+<p>A few notes:</p>
+<ol>
+<li>You can see how the &ldquo;Completed&rdquo; progress bar didn&rsquo;t reach the end due to skipped hosts</li>
+<li>In the report you can see &ldquo;group_name&rdquo;, &ldquo;failed_hosts&rdquo;, &ldquo;skipped_hosts&rdquo;, &ldquo;error&rdquo;</li>
+<li>Notice how when even devices (i.e. leaf32.mercury) failed, the even device was skipped</li>
+<li>However, if the odd device failed, the even wasn&rsquo;t skipped. This is because the even device was executed before the odd one</li>
+</ol>
+</section><section>
+<h3 id="with_runner-vs-configuration">with_runner vs configuration</h3>
+<p>In the example we chose the runner with the following code:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape>dc_runner <span style="color:#f92672">=</span> DCAwareRunner(num_workers<span style="color:#f92672">=</span><span style="color:#ae81ff">100</span>)
+nr <span style="color:#f92672">=</span> nr<span style="color:#f92672">.</span>with_runner(dc_runner)
+</code></pre></div><p>This allows you to set up the runner &ldquo;at runtime&rdquo;, but you can also configure it like this if you prefer:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape>nr <span style="color:#f92672">=</span> InitNornir(
+    runner<span style="color:#f92672">=</span>{
+        <span style="color:#e6db74">&#34;plugin&#34;</span>: <span style="color:#e6db74">&#34;DCAwareRunner&#34;</span>,
+        <span style="color:#e6db74">&#34;options&#34;</span>: {
+            <span style="color:#e6db74">&#34;num_workers&#34;</span>: <span style="color:#ae81ff">100</span>,
+        },
+    },
+)
+</code></pre></div><p>You can choose one method or the other depending on your needs</p>
+</section><section>
+<h3 id="questions-so-far">Questions so far?</h3>
+
+</section>
+</section>
+    <section>
+
+<section data-shortcode-section>
+<h2 id="functions">Functions</h2>
+<p>A nornir function is a standard python function you invoke on your own</p>
+<p>There are no rules to write them :)</p>
+<p><code>print_result</code> is the most well known example of a nornir function</p>
+</section><section>
+<h3 id="example-rich_table">Example: rich_table</h3>
+<p>We are going to write an alternative to <code>print_result</code> that leverages <a href="https://github.com/willmcgugan/rich">rich</a></p>
+</section><section>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#75715e"># nornir3_demo/plugins/functions/rich.py</span>
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">rich_table</span>(results: AggregatedResult) <span style="color:#f92672">-&gt;</span> None:
+    console <span style="color:#f92672">=</span> Console()
+
+    <span style="color:#66d9ef">for</span> hostname, host_result <span style="color:#f92672">in</span> results<span style="color:#f92672">.</span>items():
+        table <span style="color:#f92672">=</span> Table(box<span style="color:#f92672">=</span>MINIMAL_DOUBLE_HEAD)
+        table<span style="color:#f92672">.</span>add_column(hostname, justify<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;right&#34;</span>, style<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;cyan&#34;</span>, no_wrap<span style="color:#f92672">=</span>True)
+        table<span style="color:#f92672">.</span>add_column(<span style="color:#e6db74">&#34;result&#34;</span>)
+        table<span style="color:#f92672">.</span>add_column(<span style="color:#e6db74">&#34;changed&#34;</span>)
+
+        <span style="color:#66d9ef">for</span> r <span style="color:#f92672">in</span> host_result:
+            text <span style="color:#f92672">=</span> Text()
+            <span style="color:#66d9ef">if</span> r<span style="color:#f92672">.</span>failed:
+                text<span style="color:#f92672">.</span>append(f<span style="color:#e6db74">&#34;{r.exception}&#34;</span>, style<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;red&#34;</span>)
+            <span style="color:#66d9ef">else</span>:
+                text<span style="color:#f92672">.</span>append(f<span style="color:#e6db74">&#34;{r.result or &#39;&#39;}&#34;</span>, style<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;green&#34;</span>)
+
+            changed <span style="color:#f92672">=</span> Text()
+            <span style="color:#66d9ef">if</span> r<span style="color:#f92672">.</span>changed:
+                color <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;orange3&#34;</span>
+            <span style="color:#66d9ef">else</span>:
+                color <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;green&#34;</span>
+            changed<span style="color:#f92672">.</span>append(f<span style="color:#e6db74">&#34;{r.changed}&#34;</span>, style<span style="color:#f92672">=</span>color)
+            table<span style="color:#f92672">.</span>add_row(r<span style="color:#f92672">.</span>name, text, changed)
+        console<span style="color:#f92672">.</span><span style="color:#66d9ef">print</span>(table)
+</code></pre></div></section><section>
+<p>Script:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#f92672">from</span> nornir <span style="color:#f92672">import</span> InitNornir
+
+<span style="color:#f92672">from</span> nornir3_demo.plugins.tasks <span style="color:#f92672">import</span> acmeos
+<span style="color:#f92672">from</span> nornir3_demo.plugins.functions.rich <span style="color:#f92672">import</span> rich_table
+
+<span style="color:#f92672">from</span> nornir.core.task <span style="color:#f92672">import</span> Task
+
+
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">gather_info</span>(task: Task) <span style="color:#f92672">-&gt;</span> None:
+    task<span style="color:#f92672">.</span>run(task<span style="color:#f92672">=</span>acmeos<span style="color:#f92672">.</span>get_version)
+    task<span style="color:#f92672">.</span>run(task<span style="color:#f92672">=</span>acmeos<span style="color:#f92672">.</span>get_cpu_ram)
+
+
+nr <span style="color:#f92672">=</span> InitNornir(
+    inventory<span style="color:#f92672">=</span>{<span style="color:#e6db74">&#34;plugin&#34;</span>: <span style="color:#e6db74">&#34;ACMEInventory&#34;</span>, <span style="color:#e6db74">&#34;options&#34;</span>: {<span style="color:#e6db74">&#34;filter_sites&#34;</span>: [<span style="color:#e6db74">&#34;earth&#34;</span>]}}
+)
+
+results <span style="color:#f92672">=</span> nr<span style="color:#f92672">.</span>run(task<span style="color:#f92672">=</span>gather_info)
+rich_table(results)
+</code></pre></div></section><section>
+<p>Output:</p>
+<figure>
+    <img src="img/rich_table.png"
+         alt="rich table" width="70%"/> 
+</figure>
+</section><section>
+<h3 id="example-dcaware-report">Example: dcaware report</h3>
+<p>In the previous section we built a <code>DCAwareRunner</code>. This runner returned a report indicating which hosts failed and which ones were skipped and why. We are going to build a function that processes that report and builds a nice table.</p>
+</section><section>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">rich_dc_aware_report</span>(dc_runner: DCAwareRunner) <span style="color:#f92672">-&gt;</span> Table:
+    table <span style="color:#f92672">=</span> Table(box<span style="color:#f92672">=</span>MINIMAL_DOUBLE_HEAD, title<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;DCAwareRunner report&#34;</span>)
+    table<span style="color:#f92672">.</span>add_column(<span style="color:#e6db74">&#34;group&#34;</span>, justify<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;right&#34;</span>, style<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;blue&#34;</span>, no_wrap<span style="color:#f92672">=</span>True)
+    table<span style="color:#f92672">.</span>add_column(<span style="color:#e6db74">&#34;failed&#34;</span>, style<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;red&#34;</span>)
+    table<span style="color:#f92672">.</span>add_column(<span style="color:#e6db74">&#34;skipped&#34;</span>, style<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;sky_blue3&#34;</span>)
+    table<span style="color:#f92672">.</span>add_column(<span style="color:#e6db74">&#34;error&#34;</span>)
+
+    <span style="color:#66d9ef">for</span> group_name, failed, skipped, exc <span style="color:#f92672">in</span> dc_runner<span style="color:#f92672">.</span>report():
+        failed_hosts <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;, &#34;</span><span style="color:#f92672">.</span>join([h<span style="color:#f92672">.</span>name <span style="color:#66d9ef">for</span> h <span style="color:#f92672">in</span> failed])
+        skipped_hosts <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;, &#34;</span><span style="color:#f92672">.</span>join([h<span style="color:#f92672">.</span>name <span style="color:#66d9ef">for</span> h <span style="color:#f92672">in</span> skipped])
+        table<span style="color:#f92672">.</span>add_row(group_name, failed_hosts, skipped_hosts, f<span style="color:#e6db74">&#34;{exc}&#34;</span>)
+
+    <span style="color:#66d9ef">return</span> table
+</code></pre></div></section><section>
+<h3 id="example-dcaware-report-1">Example: dcaware report</h3>
+<p>Script:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#75715e"># demo/scripts/51_dc_aware_runner_report.py</span>
+
+<span style="color:#f92672">from</span> nornir <span style="color:#f92672">import</span> InitNornir
+
+<span style="color:#f92672">from</span> nornir3_demo.plugins.processors.rich <span style="color:#f92672">import</span> ProgressBar
+<span style="color:#f92672">from</span> nornir3_demo.plugins.runners.dc_aware <span style="color:#f92672">import</span> DCAwareRunner
+<span style="color:#f92672">from</span> nornir3_demo.plugins.tasks <span style="color:#f92672">import</span> acmeos
+<span style="color:#f92672">from</span> nornir3_demo.plugins.functions.rich <span style="color:#f92672">import</span> rich_dc_aware_report
+
+<span style="color:#f92672">from</span> rich.console <span style="color:#f92672">import</span> Console
+
+nr <span style="color:#f92672">=</span> InitNornir(inventory<span style="color:#f92672">=</span>{<span style="color:#e6db74">&#34;plugin&#34;</span>: <span style="color:#e6db74">&#34;ACMEInventory&#34;</span>})
+
+total_hosts <span style="color:#f92672">=</span> len(nr<span style="color:#f92672">.</span>inventory<span style="color:#f92672">.</span>hosts)
+dc_runner <span style="color:#f92672">=</span> DCAwareRunner(num_workers<span style="color:#f92672">=</span><span style="color:#ae81ff">100</span>)
+nr <span style="color:#f92672">=</span> nr<span style="color:#f92672">.</span>with_processors([ProgressBar(total_hosts)])<span style="color:#f92672">.</span>with_runner(dc_runner)
+
+nr<span style="color:#f92672">.</span>run(task<span style="color:#f92672">=</span>acmeos<span style="color:#f92672">.</span>upgrade_os, version<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;5.3.1&#34;</span>)
+
+table <span style="color:#f92672">=</span> rich_dc_aware_report(dc_runner)
+Console()<span style="color:#f92672">.</span><span style="color:#66d9ef">print</span>(<span style="color:#e6db74">&#34;</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>, table)
+</code></pre></div></section><section>
+<p>Output:</p>
+<figure>
+    <img src="img/rich_report.png"
+         alt="progress bar" width="90%"/> 
+</figure>
+</section><section>
+<h3 id="questions-so-far">Questions so far?</h3>
+
+</section>
+</section>
+    <section>
+
+<section data-shortcode-section>
+<h2 id="orchestrator">Orchestrator</h2>
+<p>Finally we are going to wrap everything up by writing a POC for an orchestraor</p>
+<p>It won&rsquo;t be feature complete but it will highlight its capabilities</p>
+</section><section>
+<h2 id="objective-and-steps">Objective and Steps</h2>
+<ul>
+<li>Write a HTTP API that allows us to execute tasks over our network</li>
+<li>To showcase the orchestrator we will have an endpoint that will upgrade the OS in our entire network leveraging everything we built so far</li>
+<li>We will use flask to write the service</li>
+<li>We will write an <a href="https://swagger.io/">OpenAPI specification</a></li>
+<li>Finally we will add some instrumentation</li>
+</ul>
+</section><section>
+<h2 id="openapi-specification">OpenAPI Specification</h2>
+<p>The specification can be found under <a href="https://github.com/nornir-automation/nornir3_demo/blob/master/demo/orchestrator/swagger.yaml">orchestrator.yaml</a></p>
+<p>Let&rsquo;s start by writing and endpoint to serve it so we can usee the swagger-ui</p>
+</section><section>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">respond</span>(raw: Any) <span style="color:#f92672">-&gt;</span> Response:
+    <span style="color:#e6db74">&#34;&#34;&#34;
+</span><span style="color:#e6db74">    This methods serializes the response into json and
+</span><span style="color:#e6db74">    set the appropiate HTTP headers
+</span><span style="color:#e6db74">    &#34;&#34;&#34;</span>
+    <span style="color:#66d9ef">return</span> Response(
+        json<span style="color:#f92672">.</span>dumps(raw),
+        status<span style="color:#f92672">=</span><span style="color:#ae81ff">200</span>,
+        headers<span style="color:#f92672">=</span>{
+            <span style="color:#e6db74">&#34;Content-Type&#34;</span>: <span style="color:#e6db74">&#34;application/json&#34;</span>,
+            <span style="color:#e6db74">&#34;Access-Control-Allow-Origin&#34;</span>: <span style="color:#e6db74">&#34;*&#34;</span>,  <span style="color:#75715e"># this is certainly not good in prod!!!</span>
+            <span style="color:#e6db74">&#34;Access-Control-Allow-Methods&#34;</span>: <span style="color:#e6db74">&#34;GET, POST, DELETE, PUT, PATCH, OPTIONS&#34;</span>,
+        },
+    )
+
+<span style="color:#a6e22e">@app.route</span>(<span style="color:#e6db74">&#34;/swagger/&#34;</span>)
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">swagger</span>() <span style="color:#f92672">-&gt;</span> Response:
+    <span style="color:#e6db74">&#34;&#34;&#34;
+</span><span style="color:#e6db74">    Serves the spec so we can use the swagger-ui
+</span><span style="color:#e6db74">    &#34;&#34;&#34;</span>
+    <span style="color:#66d9ef">with</span> open(<span style="color:#e6db74">&#34;swagger.yaml&#34;</span>, <span style="color:#e6db74">&#34;r&#34;</span>) <span style="color:#66d9ef">as</span> f:
+        yml <span style="color:#f92672">=</span> ruamel<span style="color:#f92672">.</span>yaml<span style="color:#f92672">.</span>YAML()
+        spec_data <span style="color:#f92672">=</span> yml<span style="color:#f92672">.</span>load(f)
+    <span style="color:#66d9ef">return</span> respond(spec_data)
+</code></pre></div></section><section>
+<p>We can start the orchestrar so far with:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape>$ cd demo/orchestrator
+$ python orchestrator.py
+ * Serving Flask app <span style="color:#e6db74">&#34;orchestrator&#34;</span> <span style="color:#f92672">(</span>lazy loading<span style="color:#f92672">)</span>
+ * Environment: production
+   WARNING: This is a development server. Do not use it in a production deployment.
+   Use a production WSGI server instead.
+ * Debug mode: off
+ * Running on http://0.0.0.0:5000/ <span style="color:#f92672">(</span>Press CTRL+C to quit<span style="color:#f92672">)</span>
+</code></pre></div><p>Now we can start <code>swagger-ui</code>:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape>docker run --rm -p 8080:8080 swaggerapi/swagger-ui
+</code></pre></div></section><section>
+<p>With everything up and running we can go to the URL <a href="http://localhost:8080">http://localhost:8080</a> and enter the URL to explore <code>http://localhost:5000/swagger/</code></p>
+</section><section>
+<figure>
+    <img src="img/swagger_1.png"
+         alt="swagger 1" width="90%"/> 
+</figure>
+</section><section>
+<figure>
+    <img src="img/swagger_2.png"
+         alt="swagger 2" width="90%"/> 
+</figure>
+</section><section>
+<figure>
+    <img src="img/swagger_3.png"
+         alt="swagger 3" width="90%"/> 
+</figure>
+</section><section>
+<p>Now let&rsquo;s implement the endpoint</p>
+</section><section>
+<p>Let&rsquo;s start by writing a method that will return the nornir object fully configured:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape>prometheus <span style="color:#f92672">=</span> Prometheus()
+
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">get_nornir</span>(
+    filter_sites: Optional[List[str]], filter_dev_types: Optional[List[str]]
+) <span style="color:#f92672">-&gt;</span> Nornir:
+    processors <span style="color:#f92672">=</span> [prometheus, Logger(<span style="color:#e6db74">&#34;orchestrator.log&#34;</span>, log_level<span style="color:#f92672">=</span>logging<span style="color:#f92672">.</span>INFO)]
+
+    <span style="color:#66d9ef">return</span> InitNornir(
+        inventory<span style="color:#f92672">=</span>{
+            <span style="color:#e6db74">&#34;plugin&#34;</span>: <span style="color:#e6db74">&#34;ACMEInventory&#34;</span>,
+            <span style="color:#e6db74">&#34;options&#34;</span>: {
+                <span style="color:#e6db74">&#34;filter_dev_types&#34;</span>: filter_dev_types,
+                <span style="color:#e6db74">&#34;filter_sites&#34;</span>: filter_sites,
+            },
+        },
+        runner<span style="color:#f92672">=</span>{
+            <span style="color:#e6db74">&#34;plugin&#34;</span>: <span style="color:#e6db74">&#34;DCAwareRunner&#34;</span>,
+            <span style="color:#e6db74">&#34;options&#34;</span>: {<span style="color:#e6db74">&#34;num_workers&#34;</span>: <span style="color:#ae81ff">100</span>}},
+    )<span style="color:#f92672">.</span>with_processors(processors)
+
+</code></pre></div><p>Note: We will get back to the <code>Prometheus()</code> processor later on.</p>
+</section><section>
+<p>Now we need to return a dictionary with the <code>completed</code>, <code>failed</code> and <code>skipped</code> hosts. That information will come from the <code>AggregatedResult</code> and <code>DCAwareRunner</code> report so let&rsquo;s write a function to generate this response:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">calculate_result</span>(
+    dc_runner: DCAwareRunner, results: AggregatedResult
+) <span style="color:#f92672">-&gt;</span> Dict[str, List[str]]:
+    report: Dict[str, List[str]] <span style="color:#f92672">=</span> {
+        <span style="color:#e6db74">&#34;failed&#34;</span>: [],
+        <span style="color:#e6db74">&#34;skipped&#34;</span>: [],
+        <span style="color:#e6db74">&#34;completed&#34;</span>: [h <span style="color:#66d9ef">for</span> h, r <span style="color:#f92672">in</span> results<span style="color:#f92672">.</span>items() <span style="color:#66d9ef">if</span> <span style="color:#f92672">not</span> r<span style="color:#f92672">.</span>failed],
+    }
+    <span style="color:#66d9ef">for</span> _, failed, skipped, _ <span style="color:#f92672">in</span> dc_runner<span style="color:#f92672">.</span>report():
+        report[<span style="color:#e6db74">&#34;failed&#34;</span>]<span style="color:#f92672">.</span>extend([h<span style="color:#f92672">.</span>name <span style="color:#66d9ef">for</span> h <span style="color:#f92672">in</span> failed])
+        report[<span style="color:#e6db74">&#34;skipped&#34;</span>]<span style="color:#f92672">.</span>extend([h<span style="color:#f92672">.</span>name <span style="color:#66d9ef">for</span> h <span style="color:#f92672">in</span> skipped])
+
+    <span style="color:#66d9ef">return</span> report
+</code></pre></div></section><section>
+<p>Finally, our endpoint is going to be just a few lines as we leverage everything we wrote so far:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#a6e22e">@app.route</span>(<span style="color:#e6db74">&#34;/upgrade-os/&#34;</span>, methods<span style="color:#f92672">=</span>[<span style="color:#e6db74">&#34;POST&#34;</span>])
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">upgrade_os_endpoint</span>() <span style="color:#f92672">-&gt;</span> Response:
+    nr <span style="color:#f92672">=</span> get_nornir(
+        request<span style="color:#f92672">.</span>json<span style="color:#f92672">.</span>get(<span style="color:#e6db74">&#34;filter_sites&#34;</span>), request<span style="color:#f92672">.</span>json<span style="color:#f92672">.</span>get(<span style="color:#e6db74">&#34;filter_dev_types&#34;</span>)
+    )
+    version <span style="color:#f92672">=</span> request<span style="color:#f92672">.</span>json[<span style="color:#e6db74">&#34;version&#34;</span>]
+
+    results <span style="color:#f92672">=</span> nr<span style="color:#f92672">.</span>run(task<span style="color:#f92672">=</span>acmeos<span style="color:#f92672">.</span>upgrade_os, version<span style="color:#f92672">=</span>version)
+
+    report <span style="color:#f92672">=</span> calculate_result(nr<span style="color:#f92672">.</span>runner, results)
+
+    <span style="color:#66d9ef">return</span> respond(report)
+</code></pre></div></section><section>
+<p>Let&rsquo;s try it out!</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape>$ curl -X POST <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  -H <span style="color:#e6db74">&#34;Content-Type: application/json&#34;</span> <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  -d <span style="color:#e6db74">&#34;{  \&#34;version\&#34;: \&#34;5.3.1\&#34;,  \&#34;filter_dev_sites\&#34;: [\&#34;earth\&#34;]}&#34;</span> <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  http://localhost:5000/upgrade-os/ | jq  <span style="color:#75715e"># use jq to make the output slightly prettier</span>
+<span style="color:#f92672">{</span>
+  <span style="color:#e6db74">&#34;failed&#34;</span>: <span style="color:#f92672">[</span>
+    <span style="color:#e6db74">&#34;leaf63.earth&#34;</span>,
+    <span style="color:#e6db74">&#34;leaf81.earth&#34;</span>,
+    <span style="color:#e6db74">&#34;leaf92.earth&#34;</span>,
+    <span style="color:#e6db74">&#34;leaf98.earth&#34;</span>
+  <span style="color:#f92672">]</span>,
+  <span style="color:#e6db74">&#34;skipped&#34;</span>: <span style="color:#f92672">[</span>
+    <span style="color:#e6db74">&#34;leaf93.earth&#34;</span>,
+    <span style="color:#e6db74">&#34;leaf99.earth&#34;</span>
+  <span style="color:#f92672">]</span>,
+  <span style="color:#e6db74">&#34;completed&#34;</span>: <span style="color:#f92672">[</span>
+    <span style="color:#e6db74">&#34;edge00.earth&#34;</span>,
+    <span style="color:#e6db74">&#34;edge01.earth&#34;</span>,
+    <span style="color:#e6db74">&#34;spine00.earth&#34;</span>,
+    <span style="color:#e6db74">&#34;spine01.earth&#34;</span>,
+    <span style="color:#e6db74">&#34;spine02.earth&#34;</span>,
+    <span style="color:#e6db74">&#34;spine03.earth&#34;</span>
+    ...
+  <span style="color:#f92672">]</span>
+<span style="color:#f92672">}</span>
+</code></pre></div></section><section>
+<p>We could run other sites or devices types if we wanted too:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape>$ curl -X POST <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  -H <span style="color:#e6db74">&#34;Content-Type: application/json&#34;</span> <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  -d <span style="color:#e6db74">&#34;{\&#34;version\&#34;: \&#34;5.3.1\&#34;, \&#34;filter_dev_types\&#34;: [\&#34;spine\&#34;]}&#34;</span> <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>  http://localhost:5000/upgrade-os/ | jq  <span style="color:#75715e"># use jq to make the output slightly prettier</span>
+<span style="color:#f92672">{</span>
+  <span style="color:#e6db74">&#34;failed&#34;</span>: <span style="color:#f92672">[</span>
+    <span style="color:#e6db74">&#34;spine00.mars&#34;</span>
+  <span style="color:#f92672">]</span>,
+  <span style="color:#e6db74">&#34;skipped&#34;</span>: <span style="color:#f92672">[</span>
+    <span style="color:#e6db74">&#34;spine01.mars&#34;</span>,
+    <span style="color:#e6db74">&#34;spine02.mars&#34;</span>,
+    <span style="color:#e6db74">&#34;spine03.mars&#34;</span>
+  <span style="color:#f92672">]</span>,
+  <span style="color:#e6db74">&#34;completed&#34;</span>: <span style="color:#f92672">[</span>
+    <span style="color:#e6db74">&#34;spine00.mercury&#34;</span>,
+    <span style="color:#e6db74">&#34;spine00.venus&#34;</span>,
+    <span style="color:#e6db74">&#34;spine00.earth&#34;</span>,
+    <span style="color:#e6db74">&#34;spine00.jupyter&#34;</span>,
+    <span style="color:#e6db74">&#34;spine00.uranus&#34;</span>,
+    ...
+  <span style="color:#f92672">]</span>
+<span style="color:#f92672">}</span>
+</code></pre></div></section><section>
+<p>Finally we are going to add some observability metrics to our system. To do so we are going to use the <code>Prometheus</code> processor you already saw in the <code>get_nornir</code> method.</p>
+<p>The prometheus processor will count successes, changes and failures so we can graph them over time.</p>
+</section><section>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#75715e"># nornir3_demo/plugins/processors/prometheus.py</span>
+<span style="color:#f92672">from</span> nornir.core.inventory <span style="color:#f92672">import</span> Host
+<span style="color:#f92672">from</span> nornir.core.task <span style="color:#f92672">import</span> AggregatedResult, MultiResult, Task
+
+<span style="color:#f92672">from</span> prometheus_client <span style="color:#f92672">import</span> Counter
+
+
+<span style="color:#66d9ef">class</span> <span style="color:#a6e22e">Prometheus</span>:
+    <span style="color:#66d9ef">def</span> __init__(self) <span style="color:#f92672">-&gt;</span> None:
+        self<span style="color:#f92672">.</span>total_task_requests <span style="color:#f92672">=</span> Counter(
+            <span style="color:#e6db74">&#34;total_task_requests&#34;</span>, <span style="color:#e6db74">&#34;Total number of task requests&#34;</span>
+        )
+        self<span style="color:#f92672">.</span>failed_tasks <span style="color:#f92672">=</span> Counter(<span style="color:#e6db74">&#34;failed_tasks&#34;</span>, <span style="color:#e6db74">&#34;Total number of task requests&#34;</span>)
+        self<span style="color:#f92672">.</span>total_tasks_per_host <span style="color:#f92672">=</span> Counter(
+            <span style="color:#e6db74">&#34;total_task_requests_per_host&#34;</span>,
+            <span style="color:#e6db74">&#34;Total number of task requests per host&#34;</span>,
+            [<span style="color:#e6db74">&#34;host&#34;</span>, <span style="color:#e6db74">&#34;site&#34;</span>, <span style="color:#e6db74">&#34;dev_type&#34;</span>],
+        )
+        self<span style="color:#f92672">.</span>failed_tasks_per_host <span style="color:#f92672">=</span> Counter(
+            <span style="color:#e6db74">&#34;failed_tasks_per_host&#34;</span>,
+            <span style="color:#e6db74">&#34;Total number of task requests per host&#34;</span>,
+            [<span style="color:#e6db74">&#34;host&#34;</span>, <span style="color:#e6db74">&#34;site&#34;</span>, <span style="color:#e6db74">&#34;dev_type&#34;</span>],
+        )
+</code></pre></div></section><section>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">task_started</span>(self, task: Task) <span style="color:#f92672">-&gt;</span> None:
+        self<span style="color:#f92672">.</span>total_task_requests<span style="color:#f92672">.</span>inc()
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">task_completed</span>(self, task: Task, result: AggregatedResult) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#66d9ef">if</span> result<span style="color:#f92672">.</span>failed:
+            self<span style="color:#f92672">.</span>failed_tasks<span style="color:#f92672">.</span>inc()
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">task_instance_started</span>(self, task: Task, host: Host) <span style="color:#f92672">-&gt;</span> None:
+        self<span style="color:#f92672">.</span>total_tasks_per_host<span style="color:#f92672">.</span>labels(
+            task<span style="color:#f92672">.</span>host<span style="color:#f92672">.</span>name, task<span style="color:#f92672">.</span>host<span style="color:#f92672">.</span>data[<span style="color:#e6db74">&#34;site&#34;</span>], task<span style="color:#f92672">.</span>host<span style="color:#f92672">.</span>data[<span style="color:#e6db74">&#34;dev_type&#34;</span>]
+        )<span style="color:#f92672">.</span>inc()
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">task_instance_completed</span>(
+        self, task: Task, host: Host, results: MultiResult
+    ) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#66d9ef">if</span> results<span style="color:#f92672">.</span>failed:
+            self<span style="color:#f92672">.</span>failed_tasks_per_host<span style="color:#f92672">.</span>labels(
+                task<span style="color:#f92672">.</span>host<span style="color:#f92672">.</span>name, task<span style="color:#f92672">.</span>host<span style="color:#f92672">.</span>data[<span style="color:#e6db74">&#34;site&#34;</span>], task<span style="color:#f92672">.</span>host<span style="color:#f92672">.</span>data[<span style="color:#e6db74">&#34;dev_type&#34;</span>]
+            )<span style="color:#f92672">.</span>inc()
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">subtask_instance_started</span>(self, task: Task, host: Host) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#66d9ef">pass</span>
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">subtask_instance_completed</span>(self, task: Task, host: Host, result: MultiResult) <span style="color:#f92672">-&gt;</span> None:
+        <span style="color:#66d9ef">pass</span>
+</code></pre></div></section><section>
+<p>Now we add an endpoint to our orchestrator to expose these metrics:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape><span style="color:#a6e22e">@app.route</span>(<span style="color:#e6db74">&#34;/metrics/&#34;</span>)
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">metrics</span>() <span style="color:#f92672">-&gt;</span> Response:
+    CONTENT_TYPE_LATEST <span style="color:#f92672">=</span> str(<span style="color:#e6db74">&#34;text/plain; version=0.0.4; charset=utf-8&#34;</span>)
+    <span style="color:#66d9ef">return</span> Response(prometheus_client<span style="color:#f92672">.</span>generate_latest(), mimetype<span style="color:#f92672">=</span>CONTENT_TYPE_LATEST)
+
+</code></pre></div></section><section>
+<p>Let&rsquo;s try it:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="nohighlight" data-noescape>$ curl http://localhost:5000/metrics/
+...
+total_task_requests_per_host_total<span style="color:#f92672">{</span>dev_type<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;spine&#34;</span>,host<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;spine03.jupyter&#34;</span>,site<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;jupyter&#34;</span><span style="color:#f92672">}</span> 3.0
+total_task_requests_per_host_total<span style="color:#f92672">{</span>dev_type<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;spine&#34;</span>,host<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;spine03.uranus&#34;</span>,site<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;uranus&#34;</span><span style="color:#f92672">}</span> 3.0
+total_task_requests_per_host_total<span style="color:#f92672">{</span>dev_type<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;spine&#34;</span>,host<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;spine03.saturn&#34;</span>,site<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;saturn&#34;</span><span style="color:#f92672">}</span> 2.0
+total_task_requests_per_host_total<span style="color:#f92672">{</span>dev_type<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;spine&#34;</span>,host<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;spine03.neptune&#34;</span>,site<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;neptune&#34;</span><span style="color:#f92672">}</span> 2.0
+...
+failed_tasks_per_host_total<span style="color:#f92672">{</span>dev_type<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;spine&#34;</span>,host<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;spine03.uranus&#34;</span>,site<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;uranus&#34;</span><span style="color:#f92672">}</span> 1.0
+failed_tasks_per_host_total<span style="color:#f92672">{</span>dev_type<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;spine&#34;</span>,host<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;spine01.saturn&#34;</span>,site<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;saturn&#34;</span><span style="color:#f92672">}</span> 1.0
+failed_tasks_per_host_total<span style="color:#f92672">{</span>dev_type<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;spine&#34;</span>,host<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;spine02.neptune&#34;</span>,site<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;neptune&#34;</span><span style="color:#f92672">}</span> 1.0
+...
+</code></pre></div></section><section>
+<p>Now you could have prometheus gather this metrics, create dashboard with grafana, and see how the systems behaves over time!</p>
+</section><section>
+<h3 id="questions-so-far">Questions so far?</h3>
+
+</section>
+</section>
+    <section>
+
+<section data-shortcode-section>
+<h2 id="fin">FIN</h2>
+<p>David Barroso - <a href="https://www.linkedin.com/in/dbarrosop">linkedin</a> - <a href="https://github.com/dbarrosop/">github</a> - <a href="https://twitter.com/dbarrosop">twitter</a></p>
+<p>Part of <a href="https://www.ipspace.net/Nornir">ipSpace&rsquo;s Network Automation Roadmap</a></p>
+<p><a href="https://nornir.tech/nornir3_demo">Slides</a> <a href="https://github.com/nornir-automation/nornir3_demo">Github</a></p>
+
+</section>
+</section>
+
+</div>
+      
+
+    </div>
+<script type="text/javascript" src=/nornir3_demo/reveal-hugo/object-assign.js></script>
+
+<a href="/nornir3_demo/reveal-js/css/print/" id="print-location" style="display: none;"></a>
+<script type="text/javascript">
+  var printLocationElement = document.getElementById('print-location');
+  var link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.type = 'text/css';
+  link.href = printLocationElement.href + (window.location.search.match(/print-pdf/gi) ? 'pdf.css' : 'paper.css');
+  document.getElementsByTagName('head')[0].appendChild(link);
+</script>
+
+<script type="application/json" id="reveal-hugo-site-params">null</script>
+<script type="application/json" id="reveal-hugo-page-params">null</script>
+
+<script src="/nornir3_demo/reveal-js/js/reveal.js"></script>
+
+<script type="text/javascript">
+  
+  
+  function camelize(map) {
+    if (map) {
+      Object.keys(map).forEach(function(k) {
+        newK = k.replace(/(\_\w)/g, function(m) { return m[1].toUpperCase() });
+        if (newK != k) {
+          map[newK] = map[k];
+          delete map[k];
+        }
+      });
+    }
+    return map;
+  }
+  
+  var revealHugoDefaults = { center: true, controls: true, history: true, progress: true, transition: "slide" };
+  var revealHugoSiteParams = JSON.parse(document.getElementById('reveal-hugo-site-params').innerHTML);
+  var revealHugoPageParams = JSON.parse(document.getElementById('reveal-hugo-page-params').innerHTML);
+  
+  var options = Object.assign({},
+    camelize(revealHugoDefaults),
+    camelize(revealHugoSiteParams),
+    camelize(revealHugoPageParams));
+  Reveal.initialize(options);
+</script>
+
+
+  
+  
+  <script type="text/javascript" src="/nornir3_demo/reveal-js/plugin/markdown/marked.js"></script>
+  
+  <script type="text/javascript" src="/nornir3_demo/reveal-js/plugin/markdown/markdown.js"></script>
+  
+  <script type="text/javascript" src="/nornir3_demo/reveal-js/plugin/highlight/highlight.js"></script>
+  
+  <script type="text/javascript" src="/nornir3_demo/reveal-js/plugin/zoom-js/zoom.js"></script>
+  
+  
+  <script type="text/javascript" src="/nornir3_demo/reveal-js/plugin/notes/notes.js"></script>
+
+
+
+    
+    
+  </body>
+</html>

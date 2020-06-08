@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  
+  <url>
+    <loc>http://localhost:1313/nornir3_demo/home/00_intro/</loc>
+  </url>
+  
+  <url>
+    <loc>http://localhost:1313/nornir3_demo/home/10_inventory_plugin/</loc>
+  </url>
+  
+  <url>
+    <loc>http://localhost:1313/nornir3_demo/home/20_connection_plugin/</loc>
+  </url>
+  
+  <url>
+    <loc>http://localhost:1313/nornir3_demo/home/30_processors/</loc>
+  </url>
+  
+  <url>
+    <loc>http://localhost:1313/nornir3_demo/home/40_runners/</loc>
+  </url>
+  
+  <url>
+    <loc>http://localhost:1313/nornir3_demo/home/50_functions/</loc>
+  </url>
+  
+  <url>
+    <loc>http://localhost:1313/nornir3_demo/home/60_orchestrator/</loc>
+  </url>
+  
+  <url>
+    <loc>http://localhost:1313/nornir3_demo/home/90_outro/</loc>
+  </url>
+  
+  <url>
+    <loc>http://localhost:1313/nornir3_demo/categories/</loc>
+  </url>
+  
+  <url>
+    <loc>http://localhost:1313/nornir3_demo/home/</loc>
+  </url>
+  
+  <url>
+    <loc>http://localhost:1313/nornir3_demo/</loc>
+  </url>
+  
+  <url>
+    <loc>http://localhost:1313/nornir3_demo/tags/</loc>
+  </url>
+  
+</urlset>
