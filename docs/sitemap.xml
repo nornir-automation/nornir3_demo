@@ -3,51 +3,51 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   
   <url>
-    <loc>http://localhost:1313/nornir3_demo/home/00_intro/</loc>
+    <loc>https://nornir.tech/nornir3_demo/home/00_intro/</loc>
   </url>
   
   <url>
-    <loc>http://localhost:1313/nornir3_demo/home/10_inventory_plugin/</loc>
+    <loc>https://nornir.tech/nornir3_demo/home/10_inventory_plugin/</loc>
   </url>
   
   <url>
-    <loc>http://localhost:1313/nornir3_demo/home/20_connection_plugin/</loc>
+    <loc>https://nornir.tech/nornir3_demo/home/20_connection_plugin/</loc>
   </url>
   
   <url>
-    <loc>http://localhost:1313/nornir3_demo/home/30_processors/</loc>
+    <loc>https://nornir.tech/nornir3_demo/home/30_processors/</loc>
   </url>
   
   <url>
-    <loc>http://localhost:1313/nornir3_demo/home/40_runners/</loc>
+    <loc>https://nornir.tech/nornir3_demo/home/40_runners/</loc>
   </url>
   
   <url>
-    <loc>http://localhost:1313/nornir3_demo/home/50_functions/</loc>
+    <loc>https://nornir.tech/nornir3_demo/home/50_functions/</loc>
   </url>
   
   <url>
-    <loc>http://localhost:1313/nornir3_demo/home/60_orchestrator/</loc>
+    <loc>https://nornir.tech/nornir3_demo/home/60_orchestrator/</loc>
   </url>
   
   <url>
-    <loc>http://localhost:1313/nornir3_demo/home/90_outro/</loc>
+    <loc>https://nornir.tech/nornir3_demo/home/90_outro/</loc>
   </url>
   
   <url>
-    <loc>http://localhost:1313/nornir3_demo/categories/</loc>
+    <loc>https://nornir.tech/nornir3_demo/categories/</loc>
   </url>
   
   <url>
-    <loc>http://localhost:1313/nornir3_demo/home/</loc>
+    <loc>https://nornir.tech/nornir3_demo/home/</loc>
   </url>
   
   <url>
-    <loc>http://localhost:1313/nornir3_demo/</loc>
+    <loc>https://nornir.tech/nornir3_demo/</loc>
   </url>
   
   <url>
-    <loc>http://localhost:1313/nornir3_demo/tags/</loc>
+    <loc>https://nornir.tech/nornir3_demo/tags/</loc>
   </url>
   
 </urlset>
